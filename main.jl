@@ -8,6 +8,7 @@ using InteractiveUtils
 begin
 	using Plots
 	using ProgressBars
+	using Parameters
 end
 
 # ╔═╡ d3f35948-a39c-462c-9412-8bbefa334fe2
@@ -36,89 +37,106 @@ begin
 	"""
 end
 
+# ╔═╡ f997a055-a870-430a-8aca-5060c2fd16cb
+begin
+	@with_kw mutable struct Body
+		x::Array{Float64}= []
+		y::Array{Float64} = []
+		px::Float64 = 0
+		
+		py::Float64 = 0
+		mu::Float64 = 0.2
+		
+	
+		function Body(x, y, px=0, py=0, mu=0.2)
+			new([x], [y], px, py, mu)
+		end
+	end
+	nothing
+end
+
 # ╔═╡ 56257e88-88f1-4c52-a9b4-382f6de339f6
 begin
-	mu = 0.2
-	function u(x, y)
+	function u(x, y, mu=0.2)
 	    """Потенциал тела U(x, y)"""
 	    r1 = sqrt((x + mu)^2 + y^2)
 	    r2 = sqrt((x - 1 + mu)^2 + y^2)
 	    return (x^2 + y^2) / 2 + (1 - mu) / r1 + mu / r2 + ((1 - mu) * mu) / 2
 	end
 	
-	function h(x, y, px, py)
+	function h(x, y, px, py, mu=0.2)
 	    """Гамильтониан системы"""
-	    return ((px + y)^2 + (py - x)^2) / 2 - u(x, y)
+	    return ((px + y)^2 + (py - x)^2) / 2 - u(x, y, mu)
 	end
 	
 	
-	function diff_u_x(x, y)
+	function diff_u_x(x, y, mu=0.2)
 	    """Производная в точке от U(x, y) по x"""
 	    delta = 1e-5
-	    return  - (u(x + delta / 2, y) - u(x - delta / 2, y)) / delta
+	    return  - (u(x + delta / 2, y, mu) - u(x - delta / 2, y, mu)) / delta
 	end
 	
-	function diff_u_y(x, y)
+	function diff_u_y(x, y, mu=0.2)
 	    """Производная в точке от U(x, y) по y"""
 	    delta = 1e-5
 	    return  - (u(x, y + delta / 2) - u(x, y - delta / 2)) / delta
 	end
 	
-	function x_dot(x, y, px, py)
+	function x_dot(x, y, px, py, mu=0.2)
 	    """Скорость по x"""
 	    return px + y
 	end
 	
-	function y_dot(x, y, px, py)
+	function y_dot(x, y, px, py, mu=0.2)
 	    """Скорость по y"""
 	    return py - x
 	end
 	
-	function px_dot(x, y, px, py)
+	function px_dot(x, y, px, py, mu=0.2)
 	    """Производная по px"""
-	    return py - x + diff_u_x(x, y)
+	    return py - x + diff_u_x(x, y, mu)
 	end
 	
-	function py_dot(x, y, px, py)
+	function py_dot(x, y, px, py, mu=0.2)
 	    """Производная по py"""
-	    return -px - y + diff_u_y(x, y)
+	    return -px - y + diff_u_y(x, y, mu)
 	end
 	
-	function x_ddot(x, y, px, py)
+	function x_ddot(x, y, px, py, mu=0.2)
 	    """Вторая производная по x """
-	    return px_dot(x, y, px, py) + y_dot(x, y, px, py)
+	    return px_dot(x, y, px, py, mu) + y_dot(x, y, px, py, mu)
 	end
 	
-	function y_ddot(x, y, px, py)
+	function y_ddot(x, y, px, py, mu=0.2)
 	    """Вторая производная по Y """
 	    return py_dot(x, y, px, py) - x_dot(x, y, px, py)
 	end
 	
-	function all_dots(x, y, px, py, with_second=true)
+	function all_dots(x, y, px, py, mu=0.2, with_second=true)
 	    """Все производные: """
 	    if with_second
-	        return (x_dot(x, y, px, py), y_dot(x, y, px, py), px_dot(x, y, px, py), py_dot(x, y, px, py), x_ddot(x, y, px, py), y_ddot(x, y, px, py))
+	        return (x_dot(x, y, px, py, mu), y_dot(x, y, px, py, mu), px_dot(x, y, px, py, mu), py_dot(x, y, px, py, mu), x_ddot(x, y, px, py, mu), y_ddot(x, y, px, py, mu))
 	    else
-	        return (x_dot(x, y, px, py), y_dot(x, y, px, py), px_dot(x, y, px, py), py_dot(x, y, px, py))
+	        return (x_dot(x, y, px, py, mu), y_dot(x, y, px, py, mu), px_dot(x, y, px, py, mu), py_dot(x, y, px, py, mu))
 	    end
 	end
 	
-	function velocities_half_delta(x, y, px, py, delta_t)
-	    x_new = x - x_dot(x, y, px, py) * delta_t / 2 + x_ddot(x, y, px, py) * (delta_t / 2)^2 / 2
-	    y_new = y - y_dot(x, y, px, py) * delta_t / 2 + y_ddot(x, y, px, py)
-	    px_new = px - px_dot(x, y, px, py) * delta_t / 2
-	    py_new = py - py_dot(x, y, px, py) * delta_t / 2
-	    return (x_dot(x_new, y_new, px_new, py_new), y_dot(x_new, y_new, px_new, py_new))
+	function velocities_half_delta(x, y, px, py, mu=0.2, delta_t=1e-4)
+	    x_new = x - x_dot(x, y, px, py, mu) * delta_t / 2 + x_ddot(x, y, px, py, mu) * delta_t^2 / 8
+	    y_new = y - y_dot(x, y, px, py, mu) * delta_t / 2 + y_ddot(x, y, px, py, mu) * delta_t^2 / 8
+	    px_new = px - px_dot(x, y, px, py, mu) * delta_t / 2
+	    py_new = py - py_dot(x, y, px, py, mu) * delta_t / 2
+	    return (x_dot(x_new, y_new, px_new, py_new, mu), y_dot(x_new, y_new, px_new, py_new, mu))
 	end
 	
-	function W(x::Float64, y::Float64)
+	function W(x::Float64, y::Float64, mu=0.2)
 	    """Функция нормализации значения"""
-	    return -log((abs(diff_u_x(x, y)) + abs(diff_u_y(x, y))), ℯ)
+	    return -log((abs(diff_u_x(x, y, mu)) + abs(diff_u_y(x, y, mu))), ₑ)
 	end
 	
-	function h_const(x, y, px=0, py=0)
+	function h_const(x, y, px=0, py=0, mu=0.2)
 	    """Подсчёт постоянной Якоби"""
-	    return 0.5 * (x_dot(x, y, px, py) ^ 2 + y_dot(x, y, px, py) ^ 2) - u(x, y)
+	    return 0.5 * (x_dot(x, y, px, py, mu) ^ 2 + y_dot(x, y, px, py, mu) ^ 2) - u(x, y)
 	end
 	
 	function puancare(X, Y, delta_t)
@@ -126,7 +144,7 @@ begin
 	    """Построение сечения Пуанкаре по заданной траектории"""
 		x_result = []
 		x_dot_result = []
-	    for (n, y) in enumerate(Y[1:length(Y) - 1])
+	    for (n, y) in enumerate(Y[1:end-1])
 	        
 	        if y * Y[n + 1] <= 0
 	            
@@ -136,7 +154,7 @@ begin
 	    end
 	    return (x_result, x_dot_result)
 	end
-	
+	nothing
 end
 
 # ╔═╡ 9f7c73f7-226e-4c04-9741-834f46531deb
@@ -237,25 +255,36 @@ md"""
 Движение точки в задаче трёх тел описывается уравнениями движения, описанными во введении. В программе перемещение точки задаётся функцией `move(x, y, px=0, py=0, t=100000, scfale_large)`, где `x` и `y` - обязательные параметры, являющиеся начальными координатами, а `px` и `py` начальные импульсы тела, `t` - общее время движения тела, `scale_large` (если `True`, то показано движение тела относительно системы тел, если `False`, то демонстрируется движение у точки Лагранжа)
 """
 
+# ╔═╡ c322b5b7-3a0b-4a91-a833-8ea5fc0a574c
+begin
+	function leapfrog_iter!(body::Body, x_vel::Float64, y_vel::Float64, delta_t::Float64)
+		derivatives = all_dots(body.x[end], body.y[end], body.px, body.py, body.mu)
+		
+		x_vel += derivatives[5] * delta_t
+		y_vel += derivatives[6] * delta_t
+	
+		push!(body.x, body.x[end] + x_vel * delta_t)
+		push!(body.y, body.y[end] + y_vel * delta_t)
+	
+		body.px += derivatives[3] * delta_t
+		body.py += derivatives[4] * delta_t
+		return (x_vel, y_vel)
+	end
+	nothing
+end
+
 # ╔═╡ de3a78b5-bcd0-4537-8354-1418f449be4a
-function move_leapfrog(x::Float64, y::Float64; px::Float64=0.0, py::Float64=0.0, t::Int64=100000)
-    delta_t = 1e-4
-    x_vel, y_vel = velocities_half_delta(x, y, px, py, delta_t)
-    x_arr = [x]
-    y_arr = [y]
-    for i in 0:1:t
-        derivatives = all_dots(x_arr[length(x_arr)], y_arr[length(y_arr)], px, py)
-
-        x_vel += derivatives[5] * delta_t
-        y_vel += derivatives[6] * delta_t
-
-        push!(x_arr, x_arr[length(x_arr)] + x_vel * delta_t)
-        push!(y_arr, y_arr[length(y_arr)] + y_vel * delta_t)
-
-        px += derivatives[3] * delta_t
-        py += derivatives[4] * delta_t
-    end
-    return (x_arr, y_arr)
+begin
+	function move_leapfrog(body::Body, t::Float64=1.0, delta_t::Float64=1e-4)
+	    
+		x_vel, y_vel = velocities_half_delta(body.x[end], body.y[end], body.px, body.py, delta_t)
+	    
+	    for i in 0:1:(t / delta_t)
+	        x_vel, y_vel = leapfrog_iter!(body, x_vel, y_vel, delta_t)
+	    end
+	    return (body.x, body.y)
+	end
+	nothing
 end
 
 # ╔═╡ 911f528b-816a-4c6e-9538-2530309f70c6
@@ -283,65 +312,62 @@ end
 
 # ╔═╡ f06cf227-88de-4f3f-9fc5-1714330a8e3a
 begin
-	L1 = move_leapfrog(L_x[1] - 1e-6, 0.0, px=0.0, py=0.4371024, t=14520)
+	L1 = move_leapfrog(Body(x=L_x[1] - 1e-6, y=0.0, px=0.0, py=0.4372524), 1.44)
 	Plots.plot(L1[1], L1[2])
+	
 end
 
 # ╔═╡ 32629dd1-a7fd-45d9-9623-d5665586f489
 begin
-	L2 = move_leapfrog(L_x[2], L_y[2], px=0.0, py=1.27183, t=21500)
+	L2 = move_leapfrog(Body(x=L_x[2], y=L_y[2], px=0.0, py=1.27183), 2.15)
 	Plots.plot(L2[1], L2[2])
 end
 
 # ╔═╡ b8411d90-48e6-403c-ad68-d6671bb53dd6
 begin
-	L3 = move_leapfrog(L_x[3], L_y[3], px=0.0, py=-1.0855, t=23500)
+	L3 = move_leapfrog(Body(x=L_x[3], y=L_y[3], px=0.0, py=-1.0855), 2.35)
 	Plots.plot(L3[1], L3[2])
 end
 
 # ╔═╡ 0f50bb6b-55ca-446a-9ee3-18b528b947d4
 begin
-	L4 = move_leapfrog(L_x[4], L_y[4], px=-1.0, py=0.0, t=1000000)
+	L4 = move_leapfrog(Body(x=L_x[4], y=L_y[4], px=-1.0, py=0.0), 100.0)
 	Plots.plot(L4[1], L4[2])
 end
 
 # ╔═╡ ec834d95-fba6-4b7f-9ab4-804113dabf1b
 begin
-	L5 = move_leapfrog(L_x[5], L_y[5], px=0.9, py=0.5, t=1000000)
+	L5 = move_leapfrog(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5), 100.0)
 	Plots.plot(L5[1], L5[2])
 end
 
 # ╔═╡ 93267c29-cc40-4515-a1fb-28c806d4cbb5
 begin
-	X, Y = move_leapfrog(L_x[1], L_y[1], px=0.0, py=0.0, t=300000)
-	Plots.plot(X, Y)
-	Plots.scatter!([-mu, 1-mu], [0, 0])
+	body1 = Body(L_x[1], L_y[1], 0.0, 0.0)
+	move_leapfrog(body1, 30.0)
+	Plots.plot(body1.x, body1.y)
+	Plots.scatter!([-body1.mu, 1-body1.mu], [0, 0])
 end
 
 # ╔═╡ bb78e7c5-53bf-4c3d-8fec-a9f5a6adea5a
 begin
 	delta_t = 1e-4
-	
-	ans_x1, ans_y1 = puancare(X, Y, delta_t)
+	ans_x1, ans_y1 = puancare(body1.x, body1.y, delta_t)
 	Plots.scatter(ans_x1, ans_y1)
 end
 
 # ╔═╡ bd0514de-cc8d-485a-b0e5-46c8d130988f
 begin
-	x = 0.4  # @param {type:"slider", min:-1, max:1, step:0.001}
-	y = 0.4  # @param {type:"slider", min:-1, max:1, step:0.001}
-	px = 0.334  # @param {type:"slider", min:-1, max:1, step:0.001}
-	py = -0.5  # @param {type:"slider", min:-1, max:1, step:0.001}
-	t = 550000
-	X1, Y1 = move_leapfrog(x, y, px=px, py=py, t=t)
+	body2 = Body(x = 0.4, y = 0.4, px = 0.334, py = -0.5)
+	move_leapfrog(body2, 100.0)
 	
-	Plots.plot(X1, Y1)
-	Plots.scatter!([-mu, 1-mu], [0, 0])
+	Plots.plot(body2.x, body2.y)
+	Plots.scatter!([-body2.mu, 1-body2.mu], [0, 0])
 end
 
 # ╔═╡ d23baf85-ce21-4a93-bc95-a6643cd59ce7
 begin
-	ans_x2, ans_y2 = puancare(X1, Y1, 1e-4)
+	ans_x2, ans_y2 = puancare(body2.x, body2.y, 1e-4)
 	Plots.scatter(ans_x2, ans_y2)
 end
 
@@ -390,7 +416,7 @@ begin
 	        end
 	    end
 	end
-	a, b = move_leapfrog(L_x[1], 0.4, px=0.0, py=0.0, t=10000000)
+	a, b = move_leapfrog(Body(x=L_x[1], y=0.4, px=0.0, py=0.0), 1000.0)
 	scatter(ans_xx, ans_yy)
 	plot!(a, b)
 end
@@ -402,7 +428,7 @@ md"""
 
 # ╔═╡ c361a162-30ee-47b8-88f4-2e59225da70c
 begin
-	ɼ1, ɼ2 = move_leapfrog(1000.0, 10000000.0, px=1000000.0, py=10000000.0, t=1000000)
+	ɼ1, ɼ2 = move_leapfrog(Body(x=1000.0, y=10000000.0, px=1000000.0, py=10000000.0), 100.0)
 	plot(ɼ1, ɼ2)
 end
 
@@ -412,66 +438,54 @@ md"""
 """
 
 # ╔═╡ 1c0ad33c-2490-4922-9c61-8b5595cef356
-@fastmath function animate_non_rotating(x::Float64, y::Float64; px::Float64=0.0, py::Float64=0.0, t::Int64=100000, frames::Int64 = 200, xlim::Float64=2.0, ylim::Float64=2.0)
-	ro1, ro2 = -mu, 1 - mu
+@fastmath function animate_non_rotating(body::Body; t::Float64=10.0, delta_t::Float64=1e-4, frames::Int64 = 200, xlim::Float64=2.0, ylim::Float64=2.0, name::String="main.gif", fps::Int64=60)
+	ro1, ro2 = -body.mu, 1 - body.mu
 	psi = 0
 	circle_dots = range(0, 2π, length = 100)
 
 		
 	delta_t = 1e-4
-    x_vel, y_vel = velocities_half_delta(x, y, px, py, delta_t)
-    x_arr = [x]
-    y_arr = [y]
-	points = [-mu, 1-mu, x], [0, 0, y]
+    x_vel, y_vel = velocities_half_delta(body.x[end], body.y[end], body.px, body.py, delta_t)
+	points = [-body.mu, 1-body.mu], [0, 0]
 	scatter(points)
 	
-	anim = @animate for i in 0:1:t
-        derivatives = all_dots(x_arr[length(x_arr)], y_arr[length(y_arr)], px, py)
-
-        x_vel += derivatives[5] * delta_t
-        y_vel += derivatives[6] * delta_t
-
-        push!(x_arr, x_arr[length(x_arr)] + x_vel * delta_t)
-        push!(y_arr, y_arr[length(y_arr)] + y_vel * delta_t)
-		x, y = x_arr[length(x_arr)], y_arr[length(y_arr)]
-        px += derivatives[3] * delta_t
-        py += derivatives[4] * delta_t
-
-		psi += delta_t
+	anim = @animate for i in 0:1:(t / delta_t)
+        x_vel, y_vel = leapfrog_iter!(body, x_vel, y_vel, delta_t)
+		psi += delta_t 
 		x1, y1 = ro1 * cos(psi), ro1 * sin(psi)
 		x2, y2 = ro2 * cos(psi), ro2 * sin(psi)
+		
 		if i % frames == 0
-
-			
-			x_1 = x * cos(psi) - y * sin(psi)
-			y_1 = x * sin(psi) + y * cos(psi)
+			x_1 = body.x[end] * cos(psi) - body.y[end] * sin(psi)
+			y_1 = body.x[end] * sin(psi) + body.y[end] * cos(psi)
 			scatter([x1, x2], [y1, y2], xlim=(-xlim, xlim), ylim=(-ylim, ylim), color="black")
 			scatter!([x_1], [y_1], color="magenta")
 			plot!(@. sin(circle_dots) * ro1, @. cos(circle_dots) * ro1) 
 			plot!(@. sin(circle_dots) * ro2, @. cos(circle_dots) * ro2) 
 		end
 	end every frames
-	gif(anim, "main.gif", fps=60)
+	gif(anim, name, fps=fps)
 end
 
 # ╔═╡ 5939245c-0571-4e24-a39b-53d813a61e62
 # ╠═╡ skip_as_script = true
 #=╠═╡
-animate_non_rotating(L_x[5], L_y[5], px=0.9, py=0.5, t=1000000, frames=500)
-
+animate_non_rotating(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5), t=10.0, frames=500)
   ╠═╡ =#
 
 # ╔═╡ 82016362-5e1c-411f-813a-2d92c8265537
 # ╠═╡ show_logs = false
-animate_non_rotating(1000.0, 10000000.0, px=1000000.0, py=10000000.0, t=1000000, frames=500, xlim=1e6, ylim=2.5e7)
+animate_non_rotating(Body(x=0.0, y=10000000.0, px=10000000.0, py=0.0), t=10.0, frames=500, xlim=2.5e7, ylim=2.5e7, name="ellips.gif")
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 ProgressBars = "49802e3a-d2f1-5c88-81d8-b72133a6f568"
 
 [compat]
+Parameters = "~0.12.3"
 Plots = "~1.39.0"
 ProgressBars = "~1.5.1"
 """
@@ -482,7 +496,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "a35326ab7f59df17a218b373b6eef5a4f20c2e7a"
+project_hash = "5628a1d30e731d4c623d3ef79c5beed952aefdf3"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -983,6 +997,12 @@ deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
 version = "10.42.0+0"
 
+[[deps.Parameters]]
+deps = ["OrderedCollections", "UnPack"]
+git-tree-sha1 = "34c0e9ad262e5f7fc75b10a9952ca7692cfc5fbe"
+uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+version = "0.12.3"
+
 [[deps.Parsers]]
 deps = ["Dates", "PrecompileTools", "UUIDs"]
 git-tree-sha1 = "716e24b21538abc91f6205fd1d8363f39b442851"
@@ -1195,6 +1215,11 @@ version = "1.5.0"
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
 uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
+
+[[deps.UnPack]]
+git-tree-sha1 = "387c1f73762231e86e0c9c5443ce3b4a0a9a0c2b"
+uuid = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
+version = "1.0.2"
 
 [[deps.Unicode]]
 uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
@@ -1468,9 +1493,10 @@ version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═f654666c-36bb-4854-ae63-3f0a1bb0343f
+# ╟─f654666c-36bb-4854-ae63-3f0a1bb0343f
 # ╟─d3f35948-a39c-462c-9412-8bbefa334fe2
 # ╟─a3e811d7-0a06-44a6-a9db-0d21983b212a
+# ╠═f997a055-a870-430a-8aca-5060c2fd16cb
 # ╠═56257e88-88f1-4c52-a9b4-382f6de339f6
 # ╟─9f7c73f7-226e-4c04-9741-834f46531deb
 # ╟─8ff68780-6554-4873-9abb-aa118e116f62
@@ -1481,8 +1507,9 @@ version = "1.4.1+0"
 # ╠═e41e33a5-212f-403f-b51c-ae94dfab293b
 # ╟─cfec2969-c486-43e8-aeed-f53157a55563
 # ╟─9a3aedf3-4958-4284-81f5-654f7835fae2
+# ╠═c322b5b7-3a0b-4a91-a833-8ea5fc0a574c
 # ╠═de3a78b5-bcd0-4537-8354-1418f449be4a
-# ╠═911f528b-816a-4c6e-9538-2530309f70c6
+# ╟─911f528b-816a-4c6e-9538-2530309f70c6
 # ╠═f06cf227-88de-4f3f-9fc5-1714330a8e3a
 # ╠═32629dd1-a7fd-45d9-9623-d5665586f489
 # ╠═b8411d90-48e6-403c-ad68-d6671bb53dd6
