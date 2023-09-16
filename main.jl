@@ -34,6 +34,7 @@ begin
 	* научиться численно моделировать механические системы
 	* изучить решения ограниченной задачи трёх тел
 	* разобраться с положением равновесия в точках Лагранжа
+	\
 	"""
 end
 
@@ -46,7 +47,7 @@ begin
 		
 		py::Float64 = 0
 		mu::Float64 = 0.2
-		
+
 	
 		function Body(x, y, px=0, py=0, mu=0.2)
 			new([x], [y], px, py, mu)
@@ -72,13 +73,13 @@ begin
 	
 	function diff_u_x(x, y, mu=0.2)
 	    """Производная в точке от U(x, y) по x"""
-	    delta = 1e-5
+	    delta = 1e-10
 	    return  - (u(x + delta / 2, y, mu) - u(x - delta / 2, y, mu)) / delta
 	end
 	
 	function diff_u_y(x, y, mu=0.2)
 	    """Производная в точке от U(x, y) по y"""
-	    delta = 1e-5
+	    delta = 1e-10
 	    return  - (u(x, y + delta / 2) - u(x, y - delta / 2)) / delta
 	end
 	
@@ -131,12 +132,12 @@ begin
 	
 	function W(x::Float64, y::Float64, mu=0.2)
 	    """Функция нормализации значения"""
-	    return -log((abs(diff_u_x(x, y, mu)) + abs(diff_u_y(x, y, mu))), ₑ)
+	    return -log((abs(diff_u_x(x, y, mu)) + abs(diff_u_y(x, y, mu))), 10)
 	end
 	
 	function h_const(x, y, px=0, py=0, mu=0.2)
 	    """Подсчёт постоянной Якоби"""
-	    return 0.5 * (x_dot(x, y, px, py, mu) ^ 2 + y_dot(x, y, px, py, mu) ^ 2) - u(x, y)
+	    return 0.5 * (x_dot(x, y, px, py, mu) ^ 2 + y_dot(x, y, px, py, mu) ^ 2) - u(x, y, mu)
 	end
 	
 	function puancare(X, Y, delta_t)
@@ -254,6 +255,18 @@ md"""
 
 Движение точки в задаче трёх тел описывается уравнениями движения, описанными во введении. В программе перемещение точки задаётся функцией `move(x, y, px=0, py=0, t=100000, scfale_large)`, где `x` и `y` - обязательные параметры, являющиеся начальными координатами, а `px` и `py` начальные импульсы тела, `t` - общее время движения тела, `scale_large` (если `True`, то показано движение тела относительно системы тел, если `False`, то демонстрируется движение у точки Лагранжа)
 """
+
+# ╔═╡ 7979f857-0489-4435-ad9e-1240c90a3525
+begin 
+	function euler_iter!(body::Body, delta_t)
+		derivatives = all_dots(body.x[end], body.y[end], body.px, body.py, body.mu)
+		push!(body.x, body.x[end] + derivatives[1] * delta_t)
+		push!(body.y, body.y[end] + derivatives[2] * delta_t)
+		body.px += derivatives[3] * delta_t
+		body.py += derivatives[4] * delta_t
+	end
+	nothing
+end
 
 # ╔═╡ c322b5b7-3a0b-4a91-a833-8ea5fc0a574c
 begin
@@ -419,6 +432,50 @@ begin
 	a, b = move_leapfrog(Body(x=L_x[1], y=0.4, px=0.0, py=0.0), 1000.0)
 	scatter(ans_xx, ans_yy)
 	plot!(a, b)
+end
+
+# ╔═╡ 5bec7dcf-5d47-4674-9cf9-7dabb4c671bf
+md"""
+Воспользуемся интегралом Якоби для определения точности численного интегрирования
+"""
+
+# ╔═╡ 1f65f3e5-432e-4c42-b194-6b16f429ce38
+function accuracy_leapfrog(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
+	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
+	ans_h = []
+	x_vel, y_vel = velocities_half_delta(body.x[end], body.y[end], body.px, body.py, delta_t)
+	for i ∈ 1:delta_t:t
+		x_vel, y_vel = leapfrog_iter!(body, x_vel, y_vel, delta_t)
+		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu) 
+		push!(ans_h, (abs(h_new) - abs(h_const0)) / abs(h_new) * 100)
+	end
+	return (ans_h, 1:delta_t:t)
+	
+end
+
+# ╔═╡ 024950bd-c4e0-454d-bf51-4c2bac424f90
+begin
+	ak1, tk1 = accuracy_leapfrog(Body(L_x[1], L_y[1], 0.0, 0.0), t=200.0)
+	scatter(tk1, ak1, markersize=0.000001)
+end
+
+# ╔═╡ 86e576f7-32fa-428c-b921-1d4652c009aa
+function accuracy_euler(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
+	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
+	ans_h = []
+	for i ∈ 1:delta_t:t
+		euler_iter!(body, delta_t)
+		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu) 
+		push!(ans_h, (abs(h_new) - abs(h_const0)) / abs(h_new) * 100)
+	end
+	return (ans_h, 1:delta_t:t)
+	
+end
+
+# ╔═╡ 08f3874a-8a2a-4c16-a9be-749beee1547b
+begin
+	ak2, tk2 = accuracy_euler(Body(L_x[1], L_y[1], 0.0, 0.0), t=200.0)
+	scatter(tk2, ak2, markersize=0.00001)
 end
 
 # ╔═╡ 30358f2c-0329-4b59-82e4-f208e8596f25
@@ -1507,6 +1564,7 @@ version = "1.4.1+0"
 # ╠═e41e33a5-212f-403f-b51c-ae94dfab293b
 # ╟─cfec2969-c486-43e8-aeed-f53157a55563
 # ╟─9a3aedf3-4958-4284-81f5-654f7835fae2
+# ╠═7979f857-0489-4435-ad9e-1240c90a3525
 # ╠═c322b5b7-3a0b-4a91-a833-8ea5fc0a574c
 # ╠═de3a78b5-bcd0-4537-8354-1418f449be4a
 # ╟─911f528b-816a-4c6e-9538-2530309f70c6
@@ -1521,6 +1579,11 @@ version = "1.4.1+0"
 # ╠═d23baf85-ce21-4a93-bc95-a6643cd59ce7
 # ╟─8eb16823-767b-4fcf-98da-3da540ca66fd
 # ╠═1207920a-0ebc-46de-b426-3abea1664eef
+# ╟─5bec7dcf-5d47-4674-9cf9-7dabb4c671bf
+# ╠═1f65f3e5-432e-4c42-b194-6b16f429ce38
+# ╠═024950bd-c4e0-454d-bf51-4c2bac424f90
+# ╠═86e576f7-32fa-428c-b921-1d4652c009aa
+# ╠═08f3874a-8a2a-4c16-a9be-749beee1547b
 # ╟─30358f2c-0329-4b59-82e4-f208e8596f25
 # ╠═c361a162-30ee-47b8-88f4-2e59225da70c
 # ╟─56d02fea-a060-4634-abe9-082c706fc0f3
