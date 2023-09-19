@@ -112,11 +112,25 @@ begin
 	    """Вторая производная по Y """
 	    return py_dot(x, y, px, py) - x_dot(x, y, px, py)
 	end
+
+	function px_ddot(x, y, px, py, mu=0.2)
+		delta = 1e-10
+		return (px_dot(x, y, px + delta / 2, py, mu) - px_dot(x, y, px - delta / 2, py, mu)) / delta
+
+	end
+
+	function py_ddot(x, y, px, py, mu=0.2)
+		delta = 1e-10
+		return (py_dot(x, y, px, py + delta / 2, mu) - py_dot(x, y, px , py- delta / 2, mu)) / delta
+
+	end
 	
-	function all_dots(x, y, px, py, mu=0.2, with_second=true)
+	function all_dots(x, y, px, py, mu=0.2; with_second=true, with_impulses=false)
 	    """Все производные: """
-	    if with_second
-	        return (x_dot(x, y, px, py, mu), y_dot(x, y, px, py, mu), px_dot(x, y, px, py, mu), py_dot(x, y, px, py, mu), x_ddot(x, y, px, py, mu), y_ddot(x, y, px, py, mu))
+	    if with_second && with_impulses
+	        return (x_dot(x, y, px, py, mu), y_dot(x, y, px, py, mu), px_dot(x, y, px, py, mu), py_dot(x, y, px, py, mu), x_ddot(x, y, px, py, mu), y_ddot(x, y, px, py, mu), px_ddot(x, y, px, py, mu), py_ddot(x, y, px, py, mu))
+		elseif with_second
+			return (x_dot(x, y, px, py, mu), y_dot(x, y, px, py, mu), px_dot(x, y, px, py, mu), py_dot(x, y, px, py, mu), x_ddot(x, y, px, py, mu), y_ddot(x, y, px, py, mu))
 	    else
 	        return (x_dot(x, y, px, py, mu), y_dot(x, y, px, py, mu), px_dot(x, y, px, py, mu), py_dot(x, y, px, py, mu))
 	    end
@@ -127,7 +141,7 @@ begin
 	    y_new = y - y_dot(x, y, px, py, mu) * delta_t / 2 + y_ddot(x, y, px, py, mu) * delta_t^2 / 8
 	    px_new = px - px_dot(x, y, px, py, mu) * delta_t / 2
 	    py_new = py - py_dot(x, y, px, py, mu) * delta_t / 2
-	    return (x_dot(x_new, y_new, px_new, py_new, mu), y_dot(x_new, y_new, px_new, py_new, mu))
+	    return (x_dot(x_new, y_new, px_new, py_new, mu), y_dot(x_new, y_new, px_new, py_new, mu), px_dot(x_new, y_new, px_new, py_new, mu), py_dot(x_new, y_new, px_new, py_new, mu))
 	end
 
 	function W(x::Float64, y::Float64, mu=0.2)
@@ -270,18 +284,19 @@ end
 
 # ╔═╡ c322b5b7-3a0b-4a91-a833-8ea5fc0a574c
 begin
-	function leapfrog_iter!(body::Body, x_vel::Float64, y_vel::Float64, delta_t::Float64)
-		derivatives = all_dots(body.x[end], body.y[end], body.px, body.py, body.mu)
+	function leapfrog_iter!(body::Body, x_vel::Float64, y_vel::Float64, px_vel::Float64, py_vel::Float64, delta_t::Float64)
+		derivatives = all_dots(body.x[end], body.y[end], body.px, body.py, body.mu, with_impulses=true)
 		
 		x_vel += derivatives[5] * delta_t
 		y_vel += derivatives[6] * delta_t
-	
+		px_vel += derivatives[7] * delta_t
+		py_vel += derivatives[8] * delta_t
 		push!(body.x, body.x[end] + x_vel * delta_t)
 		push!(body.y, body.y[end] + y_vel * delta_t)
 	
-		body.px += derivatives[3] * delta_t
-		body.py += derivatives[4] * delta_t
-		return (x_vel, y_vel)
+		body.px += px_vel * delta_t
+		body.py += py_vel * delta_t
+		return (x_vel, y_vel, px_vel, py_vel)
 	end
 	nothing
 end
@@ -290,10 +305,10 @@ end
 begin
 	function move_leapfrog(body::Body, t::Float64=1.0, delta_t::Float64=1e-4)
 	    
-		x_vel, y_vel = initial_velocities(body.x[end], body.y[end], body.px, body.py, delta_t)
+		x_vel, y_vel, px_vel, py_vel = initial_velocities(body.x[end], body.y[end], body.px, body.py, delta_t)
 	    
 	    for i in 0:delta_t:t
-	        x_vel, y_vel = leapfrog_iter!(body, x_vel, y_vel, delta_t)
+	        x_vel, y_vel, px_vel, py_vel = leapfrog_iter!(body, x_vel, y_vel, px_vel, py_vel, delta_t)
 	    end
 	    return (body.x, body.y)
 	end
@@ -347,7 +362,7 @@ end
 
 # ╔═╡ f06cf227-88de-4f3f-9fc5-1714330a8e3a
 begin
-	L1 = move_verlet(Body(x=L_x[1] - 1e-6, y=0.0, px=0.0, py=0.4372524), 1.44)
+	L1 = move_leapfrog(Body(x=L_x[1] - 1e-6, y=0.0, px=0.0, py=0.4372524), 1.44)
 	Plots.plot(L1[1], L1[2])
 	
 end
@@ -465,9 +480,9 @@ md"""
 function accuracy_leapfrog(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
 	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
 	ans_h = []
-	x_vel, y_vel = initial_velocities(body.x[end], body.y[end], body.px, body.py, delta_t)
+	x_vel, y_vel, px_vel, py_vel = initial_velocities(body.x[end], body.y[end], body.px, body.py, delta_t)
 	for i ∈ 1:delta_t:t
-		x_vel, y_vel = leapfrog_iter!(body, x_vel, y_vel, delta_t)
+		x_vel, y_vel = leapfrog_iter!(body, x_vel, y_vel, px_vel, py_vel, delta_t)
 		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu) 
 		push!(ans_h, (abs(h_new) - abs(h_const0)) / abs(h_const0) * 100)
 	end
@@ -579,6 +594,9 @@ animate_non_rotating(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5), t=10.0, frames=50
 # ╔═╡ 82016362-5e1c-411f-813a-2d92c8265537
 # ╠═╡ show_logs = false
 animate_non_rotating(Body(x=0.0, y=10000000.0, px=10000000.0, py=10000000.0), t=10.0, frames=500, xlim=2.5e7, ylim=2.5e7, name="ellips.gif")
+
+# ╔═╡ 984d2d1b-8333-4e88-ba23-d5fdcc7927a4
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1640,5 +1658,6 @@ version = "1.4.1+0"
 # ╠═1c0ad33c-2490-4922-9c61-8b5595cef356
 # ╠═5939245c-0571-4e24-a39b-53d813a61e62
 # ╠═82016362-5e1c-411f-813a-2d92c8265537
+# ╠═984d2d1b-8333-4e88-ba23-d5fdcc7927a4
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
