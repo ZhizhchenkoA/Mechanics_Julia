@@ -82,7 +82,8 @@ begin
 	    delta = 1e-10
 	    return  - (u(x, y + delta / 2) - u(x, y - delta / 2)) / delta
 	end
-	
+
+
 	function x_dot(x, y, px, py, mu=0.2)
 	    """Скорость по x"""
 	    return px + y
@@ -114,14 +115,13 @@ begin
 	end
 
 	function px_ddot(x, y, px, py, mu=0.2)
-		delta = 1e-10
-		return (px_dot(x, y, px + delta / 2, py, mu) - px_dot(x, y, px - delta / 2, py, mu)) / delta
+		
+		return py_dot(x, y, px, py, mu) - x_dot(x, y, px, py, mu) - diff_u_ddx(x, y, mu)
 
 	end
 
 	function py_ddot(x, y, px, py, mu=0.2)
-		delta = 1e-10
-		return (py_dot(x, y, px, py + delta / 2, mu) - py_dot(x, y, px , py- delta / 2, mu)) / delta
+		return -px_dot(x, y, px, py, mu) - y_dot(x, y, px, py, mu) - diff_u_ddy(x, y, mu)
 
 	end
 	
@@ -137,10 +137,10 @@ begin
 	end
 	
 	function initial_velocities(x, y, px, py, mu=0.2, delta_t=1e-4)
-	    x_new = x - x_dot(x, y, px, py, mu) * delta_t / 2 + x_ddot(x, y, px, py, mu) * delta_t^2 / 8
-	    y_new = y - y_dot(x, y, px, py, mu) * delta_t / 2 + y_ddot(x, y, px, py, mu) * delta_t^2 / 8
-	    px_new = px - px_dot(x, y, px, py, mu) * delta_t / 2
-	    py_new = py - py_dot(x, y, px, py, mu) * delta_t / 2
+	    x_new = x + x_dot(x, y, px, py, mu) * delta_t
+	    y_new = y + y_dot(x, y, px, py, mu) * delta_t 
+	    px_new = px + px_dot(x, y, px, py, mu) * delta_t
+	    py_new = py + py_dot(x, y, px, py, mu) * delta_t 
 	    return (x_dot(x_new, y_new, px_new, py_new, mu), y_dot(x_new, y_new, px_new, py_new, mu), px_dot(x_new, y_new, px_new, py_new, mu), py_dot(x_new, y_new, px_new, py_new, mu))
 	end
 
@@ -273,11 +273,11 @@ md"""
 # ╔═╡ 7979f857-0489-4435-ad9e-1240c90a3525
 begin 
 	function euler_iter!(body::Body, delta_t)
-		derivatives = all_dots(body.x[end], body.y[end], body.px, body.py, body.mu)
-		push!(body.x, body.x[end] + derivatives[1] * delta_t)
-		push!(body.y, body.y[end] + derivatives[2] * delta_t)
-		body.px += derivatives[3] * delta_t
-		body.py += derivatives[4] * delta_t
+		
+		push!(body.x, body.x[end] + x_dot(body.x[end], body.y[end], body.px, body.py, body.mu) * delta_t)
+		push!(body.y, body.y[end] + y_dot(body.x[end-1], body.y[end], body.px, body.py, body.mu) * delta_t)
+		body.px += px_dot(body.x[end], body.y[end], body.px, body.py, body.mu) * delta_t
+		body.py += py_dot(body.x[end], body.y[end], body.px, body.py, body.mu) * delta_t
 	end
 	nothing
 end
@@ -302,6 +302,8 @@ begin
 end
 
 # ╔═╡ de3a78b5-bcd0-4537-8354-1418f449be4a
+# ╠═╡ disabled = true
+#=╠═╡
 begin
 	function move_leapfrog(body::Body, t::Float64=1.0, delta_t::Float64=1e-4)
 	    
@@ -314,6 +316,7 @@ begin
 	end
 	nothing
 end
+  ╠═╡ =#
 
 # ╔═╡ 23c2bc64-eb21-4a32-b428-e2d9b325c1c1
 function verlet_iter!(body::Body, delta_t::Float64=1e-4)
@@ -336,6 +339,29 @@ function move_verlet(body::Body, t::Float64, delta_t::Float64=1e-4)
 	end
 	return (body.x, body.y)
 end
+
+# ╔═╡ d97e418c-cf1f-4ba2-9887-d5ebfc65576a
+function RK2_step!(body::Body, delta_t::Float64=1e-4)
+	k1::Vector{Float64} =  collect(all_dots(body.x[end], body.y[end], body.px, body.py, body.mu)[1:end-2])
+	k2::Vector{Float64} = collect(initial_velocities(body.x[end], body.y[end], body.px, body.py, body.mu, delta_t))
+	x, y, px, py = [body.x[end], body.y[end], body.px, body.py] + (delta_t / 2 * (k1 + k2))
+	
+	push!(body.x, x)
+	push!(body.y, y)
+	body.px = px
+	body.py = py
+end
+
+# ╔═╡ 4d54fb75-8ce1-46a5-958c-79de9572ed49
+function move_RK2(body::Body, t::Float64, delta_t::Float64=1e-4)
+	for i ∈ 0:delta_t:t
+		RK2_step!(body, delta_t)
+	end
+	return (body.x, body.y)
+end
+
+# ╔═╡ 2f4bb069-a6de-44ec-a62c-cdc54af90358
+RK2_step!(Body(1.0, 2.0, 3.0, 4.0))
 
 # ╔═╡ 911f528b-816a-4c6e-9538-2530309f70c6
 function move_leapfrog_gif(x::Float64, y::Float64; px::Float64=0.0, py::Float64=0.0, t::Int64=100000, frames::Int64=100)
@@ -362,39 +388,39 @@ end
 
 # ╔═╡ f06cf227-88de-4f3f-9fc5-1714330a8e3a
 begin
-	L1 = move_leapfrog(Body(x=L_x[1] - 1e-6, y=0.0, px=0.0, py=0.4372524), 1.44)
+	L1 = move_RK2(Body(x=L_x[1] - 1e-6, y=0.0, px=0.0, py=0.4372524), 1.44)
 	Plots.plot(L1[1], L1[2])
 	
 end
 
 # ╔═╡ 32629dd1-a7fd-45d9-9623-d5665586f489
 begin
-	L2 = move_verlet(Body(x=L_x[2], y=L_y[2], px=0.0, py=1.27183), 2.15)
+	L2 = move_RK2(Body(x=L_x[2], y=L_y[2], px=0.0, py=1.27183), 2.15)
 	Plots.plot(L2[1], L2[2])
 end
 
 # ╔═╡ b8411d90-48e6-403c-ad68-d6671bb53dd6
 begin
-	L3 = move_verlet(Body(x=L_x[3], y=L_y[3], px=0.0, py=-1.0855), 2.35)
+	L3 = move_RK2(Body(x=L_x[3], y=L_y[3], px=0.0, py=-1.0855), 2.35)
 	Plots.plot(L3[1], L3[2])
 end
 
 # ╔═╡ 0f50bb6b-55ca-446a-9ee3-18b528b947d4
 begin
-	L4 = move_verlet(Body(x=L_x[4], y=L_y[4], px=-1.0, py=0.0), 100.0)
+	L4 = move_RK2(Body(x=L_x[4], y=L_y[4], px=-1.0, py=0.0), 100.0)
 	Plots.plot(L4[1], L4[2])
 end
 
 # ╔═╡ ec834d95-fba6-4b7f-9ab4-804113dabf1b
 begin
-	L5 = move_verlet(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5), 100.0)
+	L5 = move_RK2(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5), 100.0)
 	Plots.plot(L5[1], L5[2])
 end
 
 # ╔═╡ 93267c29-cc40-4515-a1fb-28c806d4cbb5
 begin
 	body1 = Body(L_x[1], L_y[1], 0.0, 0.0)
-	move_verlet(body1, 30.0)
+	move_RK2(body1, 30.0)
 	Plots.plot(body1.x, body1.y)
 	Plots.scatter!([-body1.mu, 1-body1.mu], [0, 0])
 end
@@ -409,7 +435,7 @@ end
 # ╔═╡ bd0514de-cc8d-485a-b0e5-46c8d130988f
 begin
 	body2 = Body(x = 0.4, y = 0.4, px = 0.334, py = -0.5)
-	move_verlet(body2, 100.0)
+	move_RK2(body2, 100.0)
 	
 	Plots.plot(body2.x, body2.y)
 	Plots.scatter!([-body2.mu, 1-body2.mu], [0, 0])
@@ -466,7 +492,7 @@ begin
 	        end
 	    end
 	end
-	a, b = move_leapfrog(Body(x=L_x[1], y=0.4, px=0.0, py=0.0), 1000.0)
+	a, b = move_RK2(Body(x=L_x[1], y=0.4, px=0.0, py=0.0), 1000.0)
 	scatter(ans_xx, ans_yy)
 	plot!(a, b)
 end
@@ -477,6 +503,8 @@ md"""
 """
 
 # ╔═╡ 1f65f3e5-432e-4c42-b194-6b16f429ce38
+# ╠═╡ disabled = true
+#=╠═╡
 function accuracy_leapfrog(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
 	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
 	ans_h = []
@@ -489,12 +517,15 @@ function accuracy_leapfrog(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
 	return (ans_h, 1:delta_t:t)
 	
 end
+  ╠═╡ =#
 
 # ╔═╡ 024950bd-c4e0-454d-bf51-4c2bac424f90
+#=╠═╡
 begin
 	ak1, tk1 = accuracy_leapfrog(Body(L_x[1], L_y[1], 0.0, 0.0), t=200.0)
 	scatter(tk1, ak1, markersize=0.000001)
 end
+  ╠═╡ =#
 
 # ╔═╡ 86e576f7-32fa-428c-b921-1d4652c009aa
 function accuracy_euler(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
@@ -510,6 +541,8 @@ function accuracy_euler(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
 end
 
 # ╔═╡ 68f05f3f-01e7-49af-af05-fa2a8f09fe4d
+# ╠═╡ disabled = true
+#=╠═╡
 function accuracy_verlet(body::Body, t::Float64, delta_t::Float64=1e-4)
 	derivatives = all_dots(body.x[end], body.y[end], body.px, body.py, body.mu)
 	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
@@ -526,17 +559,28 @@ function accuracy_verlet(body::Body, t::Float64, delta_t::Float64=1e-4)
 	end
 	return (ans, 0:delta_t:t)
 end
+  ╠═╡ =#
 
 # ╔═╡ 1127fe48-8f43-40be-a861-00cc641ec3fb
+# ╠═╡ disabled = true
+#=╠═╡
 begin
 	ak3, tk3 = accuracy_verlet(Body(L_x[1], L_y[1], 0.0, 0.0), 200.0)
 	scatter(tk3, ak3, markersize=0.00001)
 end
+  ╠═╡ =#
 
-# ╔═╡ 08f3874a-8a2a-4c16-a9be-749beee1547b
-begin
-	ak2, tk2 = accuracy_euler(Body(L_x[1], L_y[1], 0.0, 0.0), t=200.0)
-	scatter(tk2, ak2, markersize=0.00001)
+# ╔═╡ ab40a600-e4ca-4927-a8cf-85d98cc9e7ca
+function accuracy_RK2(body::Body; t::Float64, delta_t::Float64=1e-4)
+	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
+	ans = [h_const0]
+	for i ∈ 0:delta_t:t
+		RK2_step!(body, delta_t)
+		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
+		push!(ans, (h_new - h_const0) / h_const0 * 100) 
+
+	end
+	return (ans, 0:delta_t:t)
 end
 
 # ╔═╡ 30358f2c-0329-4b59-82e4-f208e8596f25
@@ -546,7 +590,7 @@ md"""
 
 # ╔═╡ c361a162-30ee-47b8-88f4-2e59225da70c
 begin
-	ɼ1, ɼ2 = move_leapfrog(Body(x=1000.0, y=10000000.0, px=1000000.0, py=10000000.0), 100.0)
+	ɼ1, ɼ2 = move_RK2(Body(x=1000.0, y=10000000.0, px=1000000.0, py=10000000.0), 100.0)
 	plot(ɼ1, ɼ2)
 end
 
@@ -597,6 +641,21 @@ animate_non_rotating(Body(x=0.0, y=10000000.0, px=10000000.0, py=10000000.0), t=
 
 # ╔═╡ 984d2d1b-8333-4e88-ba23-d5fdcc7927a4
 
+
+# ╔═╡ defebd59-ba85-4b8b-a4e4-00e364b87f6e
+begin
+	ak2, tk2 = accuracy_RK2(Body(L_x[1], 0.4, 0.0, 0.0), t=200.0)
+	scatter(tk2, ak2, markersize=0.00001)
+end
+
+# ╔═╡ 08f3874a-8a2a-4c16-a9be-749beee1547b
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	ak2, tk2 = accuracy_euler(Body(L_x[1], 0.4, 0.0, 0.0), t=200.0)
+	scatter(tk2, ak2, markersize=0.00001)
+end
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1633,6 +1692,9 @@ version = "1.4.1+0"
 # ╠═de3a78b5-bcd0-4537-8354-1418f449be4a
 # ╠═23c2bc64-eb21-4a32-b428-e2d9b325c1c1
 # ╠═f09515af-4e9e-48bf-acf2-3acade5c241e
+# ╠═d97e418c-cf1f-4ba2-9887-d5ebfc65576a
+# ╠═4d54fb75-8ce1-46a5-958c-79de9572ed49
+# ╠═2f4bb069-a6de-44ec-a62c-cdc54af90358
 # ╟─911f528b-816a-4c6e-9538-2530309f70c6
 # ╠═f06cf227-88de-4f3f-9fc5-1714330a8e3a
 # ╠═32629dd1-a7fd-45d9-9623-d5665586f489
@@ -1652,6 +1714,8 @@ version = "1.4.1+0"
 # ╠═68f05f3f-01e7-49af-af05-fa2a8f09fe4d
 # ╠═1127fe48-8f43-40be-a861-00cc641ec3fb
 # ╠═08f3874a-8a2a-4c16-a9be-749beee1547b
+# ╠═ab40a600-e4ca-4927-a8cf-85d98cc9e7ca
+# ╠═defebd59-ba85-4b8b-a4e4-00e364b87f6e
 # ╟─30358f2c-0329-4b59-82e4-f208e8596f25
 # ╠═c361a162-30ee-47b8-88f4-2e59225da70c
 # ╟─56d02fea-a060-4634-abe9-082c706fc0f3
