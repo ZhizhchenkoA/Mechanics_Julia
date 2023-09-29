@@ -360,8 +360,37 @@ function move_RK2(body::Body, t::Float64, delta_t::Float64=1e-4)
 	return (body.x, body.y)
 end
 
-# ╔═╡ 2f4bb069-a6de-44ec-a62c-cdc54af90358
-RK2_step!(Body(1.0, 2.0, 3.0, 4.0))
+# ╔═╡ 29fce678-6591-4ec6-8d5f-f9b08a8de7ca
+function RK4_step!(body::Body, delta_t::Float64=1e-4)
+	position::Vector{Float64} = [body.x[end], body.y[end], body.px, body.py]
+	k1::Vector{Float64} =  collect(all_dots(position..., body.mu, with_second=false))
+	k2::Vector{Float64} = collect(all_dots((position .+ delta_t / 2 .* k1)..., body.mu, with_second=false))
+	k3::Vector{Float64} = collect(all_dots((position .+ delta_t / 2 .* k2)..., body.mu, with_second=false))
+	k4::Vector{Float64} = collect(all_dots((position .+ delta_t .* k3)..., body.mu, with_second=false))
+	x, y, px, py = position .+ (delta_t / 6) .* (k1 + 2 .* k2 + 2 .* k3 + k4)
+
+	push!(body.x, x)
+	push!(body.y, y)
+	body.px = px
+	body.py = py
+end
+
+# ╔═╡ 7d5a29c9-501b-468f-9611-d2669ae107da
+function move_RK4(body::Body, t::Float64, delta_t::Float64=1e-4)
+	for i ∈ 0:delta_t:t
+		RK4_step!(body, delta_t)
+	end
+	return (body.x, body.y)
+end
+
+# ╔═╡ 7b828d7b-8505-41c1-a780-1ba84e951872
+function stormer_step!(body::Body, delta_t::Float64=1e-4)
+	position = [body.x[end], body.y[end], body.px, body.py]
+	k1_2 = position + (delta_t / 2) .* collect(all_dots(position..., body.mu, with_second=false) .* [0, 0, 1, 1])
+end
+
+# ╔═╡ 2be21cb6-7fa5-4b62-bb2c-4761a3fa8395
+stormer_step!(Body(1.0, 2.0, 4.0, 3.0))
 
 # ╔═╡ 911f528b-816a-4c6e-9538-2530309f70c6
 function move_leapfrog_gif(x::Float64, y::Float64; px::Float64=0.0, py::Float64=0.0, t::Int64=100000, frames::Int64=100)
@@ -388,26 +417,26 @@ end
 
 # ╔═╡ f06cf227-88de-4f3f-9fc5-1714330a8e3a
 begin
-	L1 = move_RK2(Body(x=L_x[1] - 1e-6, y=0.0, px=0.0, py=0.4372524), 1.44)
+	L1 = move_RK4(Body(x=L_x[1] - 1e-6, y=0.0, px=0.0, py=0.4372524), 1.44)
 	Plots.plot(L1[1], L1[2])
 	
 end
 
 # ╔═╡ 32629dd1-a7fd-45d9-9623-d5665586f489
 begin
-	L2 = move_RK2(Body(x=L_x[2], y=L_y[2], px=0.0, py=1.27183), 2.15)
+	L2 = move_RK4(Body(x=L_x[2], y=L_y[2], px=0.0, py=1.27183), 2.15)
 	Plots.plot(L2[1], L2[2])
 end
 
 # ╔═╡ b8411d90-48e6-403c-ad68-d6671bb53dd6
 begin
-	L3 = move_RK2(Body(x=L_x[3], y=L_y[3], px=0.0, py=-1.0855), 2.35)
+	L3 = move_RK4(Body(x=L_x[3], y=L_y[3], px=0.0, py=-1.0855), 2.35)
 	Plots.plot(L3[1], L3[2])
 end
 
 # ╔═╡ 0f50bb6b-55ca-446a-9ee3-18b528b947d4
 begin
-	L4 = move_RK2(Body(x=L_x[4], y=L_y[4], px=-1.0, py=0.0), 100.0)
+	L4 = move_RK4(Body(x=L_x[4], y=L_y[4], px=-1.0, py=0.0), 100.0)
 	Plots.plot(L4[1], L4[2])
 end
 
@@ -420,7 +449,7 @@ end
 # ╔═╡ 93267c29-cc40-4515-a1fb-28c806d4cbb5
 begin
 	body1 = Body(L_x[1], L_y[1], 0.0, 0.0)
-	move_RK2(body1, 30.0)
+	move_RK4(body1, 30.0)
 	Plots.plot(body1.x, body1.y)
 	Plots.scatter!([-body1.mu, 1-body1.mu], [0, 0])
 end
@@ -570,6 +599,15 @@ begin
 end
   ╠═╡ =#
 
+# ╔═╡ 08f3874a-8a2a-4c16-a9be-749beee1547b
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	ak2, tk2 = accuracy_euler(Body(L_x[1], 0.4, 0.0, 0.0), t=200.0)
+	scatter(tk2, ak2, markersize=0.00001)
+end
+  ╠═╡ =#
+
 # ╔═╡ ab40a600-e4ca-4927-a8cf-85d98cc9e7ca
 function accuracy_RK2(body::Body; t::Float64, delta_t::Float64=1e-4)
 	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
@@ -583,6 +621,12 @@ function accuracy_RK2(body::Body; t::Float64, delta_t::Float64=1e-4)
 	return (ans, 0:delta_t:t)
 end
 
+# ╔═╡ defebd59-ba85-4b8b-a4e4-00e364b87f6e
+begin
+	ak2, tk2 = accuracy_RK2(Body(L_x[1], 0.4, 0.0, 0.0), t=200.0)
+	scatter(tk2, ak2, markersize=0.00001)
+end
+
 # ╔═╡ 30358f2c-0329-4b59-82e4-f208e8596f25
 md"""
 Тест при большом расстоянии третьего тела от объектов 
@@ -590,7 +634,7 @@ md"""
 
 # ╔═╡ c361a162-30ee-47b8-88f4-2e59225da70c
 begin
-	ɼ1, ɼ2 = move_RK2(Body(x=1000.0, y=10000000.0, px=1000000.0, py=10000000.0), 100.0)
+	ɼ1, ɼ2 = move_RK4(Body(x=1000.0, y=10000000.0, px=1000000.0, py=10000000.0), 100.0)
 	plot(ɼ1, ɼ2)
 end
 
@@ -641,21 +685,6 @@ animate_non_rotating(Body(x=0.0, y=10000000.0, px=10000000.0, py=10000000.0), t=
 
 # ╔═╡ 984d2d1b-8333-4e88-ba23-d5fdcc7927a4
 
-
-# ╔═╡ defebd59-ba85-4b8b-a4e4-00e364b87f6e
-begin
-	ak2, tk2 = accuracy_RK2(Body(L_x[1], 0.4, 0.0, 0.0), t=200.0)
-	scatter(tk2, ak2, markersize=0.00001)
-end
-
-# ╔═╡ 08f3874a-8a2a-4c16-a9be-749beee1547b
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	ak2, tk2 = accuracy_euler(Body(L_x[1], 0.4, 0.0, 0.0), t=200.0)
-	scatter(tk2, ak2, markersize=0.00001)
-end
-  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1673,7 +1702,7 @@ version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
-# ╟─f654666c-36bb-4854-ae63-3f0a1bb0343f
+# ╠═f654666c-36bb-4854-ae63-3f0a1bb0343f
 # ╟─d3f35948-a39c-462c-9412-8bbefa334fe2
 # ╟─a3e811d7-0a06-44a6-a9db-0d21983b212a
 # ╠═f997a055-a870-430a-8aca-5060c2fd16cb
@@ -1694,7 +1723,10 @@ version = "1.4.1+0"
 # ╠═f09515af-4e9e-48bf-acf2-3acade5c241e
 # ╠═d97e418c-cf1f-4ba2-9887-d5ebfc65576a
 # ╠═4d54fb75-8ce1-46a5-958c-79de9572ed49
-# ╠═2f4bb069-a6de-44ec-a62c-cdc54af90358
+# ╠═29fce678-6591-4ec6-8d5f-f9b08a8de7ca
+# ╠═7d5a29c9-501b-468f-9611-d2669ae107da
+# ╠═7b828d7b-8505-41c1-a780-1ba84e951872
+# ╠═2be21cb6-7fa5-4b62-bb2c-4761a3fa8395
 # ╟─911f528b-816a-4c6e-9538-2530309f70c6
 # ╠═f06cf227-88de-4f3f-9fc5-1714330a8e3a
 # ╠═32629dd1-a7fd-45d9-9623-d5665586f489
