@@ -53,79 +53,87 @@ begin
 			new([x], [y], px, py, mu)
 		end
 	end
+
+	function change_body!(body::Body, x::Float64, y::Float64, px::Float64, py::Float64)
+		push!(body.x, x)
+		push!(body.y, y)
+		body.px = px
+		body.py = py
+		nothing
+	end
 	nothing
 end
 
 # ╔═╡ 56257e88-88f1-4c52-a9b4-382f6de339f6
 begin
-	function u(x, y, mu=0.2)
+	function u(x::Float64, y::Float64, mu::Float64=0.2)
 	    """Потенциал тела U(x, y)"""
 	    r1 = sqrt((x + mu)^2 + y^2)
 	    r2 = sqrt((x - 1 + mu)^2 + y^2)
 	    return (x^2 + y^2) / 2 + (1 - mu) / r1 + mu / r2 + ((1 - mu) * mu) / 2
 	end
 	
-	function h(x, y, px, py, mu=0.2)
+	function h(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
 	    """Гамильтониан системы"""
 	    return ((px + y)^2 + (py - x)^2) / 2 - u(x, y, mu)
 	end
 	
 	
-	function diff_u_x(x, y, mu=0.2)
+	function diff_u_x(x::Float64, y::Float64, mu::Float64=0.2)
 	    """Производная в точке от U(x, y) по x"""
 	    delta = 1e-10
 	    return  - (u(x + delta / 2, y, mu) - u(x - delta / 2, y, mu)) / delta
 	end
 	
-	function diff_u_y(x, y, mu=0.2)
+	function diff_u_y(x::Float64, y::Float64, mu::Float64=0.2)
 	    """Производная в точке от U(x, y) по y"""
 	    delta = 1e-10
 	    return  - (u(x, y + delta / 2) - u(x, y - delta / 2)) / delta
 	end
 
 
-	function x_dot(x, y, px, py, mu=0.2)
+	function x_dot(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
 	    """Скорость по x"""
 	    return px + y
 	end
 	
-	function y_dot(x, y, px, py, mu=0.2)
+	function y_dot(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
 	    """Скорость по y"""
 	    return py - x
 	end
 	
-	function px_dot(x, y, px, py, mu=0.2)
+	function px_dot(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
 	    """Производная по px"""
 	    return py - x + diff_u_x(x, y, mu)
 	end
 	
-	function py_dot(x, y, px, py, mu=0.2)
+	function py_dot(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
 	    """Производная по py"""
 	    return -px - y + diff_u_y(x, y, mu)
 	end
 	
-	function x_ddot(x, y, px, py, mu=0.2)
+	function x_ddot(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
 	    """Вторая производная по x """
 	    return px_dot(x, y, px, py, mu) + y_dot(x, y, px, py, mu)
 	end
 	
-	function y_ddot(x, y, px, py, mu=0.2)
+	function y_ddot(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
 	    """Вторая производная по Y """
 	    return py_dot(x, y, px, py) - x_dot(x, y, px, py)
 	end
 
-	function px_ddot(x, y, px, py, mu=0.2)
+	function px_ddot(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
 		
 		return py_dot(x, y, px, py, mu) - x_dot(x, y, px, py, mu) - diff_u_ddx(x, y, mu)
 
 	end
 
-	function py_ddot(x, y, px, py, mu=0.2)
+	function py_ddot(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
 		return -px_dot(x, y, px, py, mu) - y_dot(x, y, px, py, mu) - diff_u_ddy(x, y, mu)
 
 	end
 	
-	function all_dots(x, y, px, py, mu=0.2; with_second=true, with_impulses=false)
+	function all_dots(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2; with_second=true, with_impulses=false)
 	    """Все производные: """
 	    if with_second && with_impulses
 	        return (x_dot(x, y, px, py, mu), y_dot(x, y, px, py, mu), px_dot(x, y, px, py, mu), py_dot(x, y, px, py, mu), x_ddot(x, y, px, py, mu), y_ddot(x, y, px, py, mu), px_ddot(x, y, px, py, mu), py_ddot(x, y, px, py, mu))
@@ -136,7 +144,16 @@ begin
 	    end
 	end
 	
-	function initial_velocities(x, y, px, py, mu=0.2, delta_t=1e-4)
+	function q_dots(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
+		return [x_dot(x, y, px, py, mu), y_dot(x, y, px, py, mu), 0, 0]
+	end
+
+	function p_dots(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
+		return [0, 0, px_dot(x, y, px, py, mu), py_dot(x, y, px, py, mu)]
+	end
+
+	
+	function initial_velocities(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2, delta_t::Float64=1e-4)
 	    x_new = x + x_dot(x, y, px, py, mu) * delta_t
 	    y_new = y + y_dot(x, y, px, py, mu) * delta_t 
 	    px_new = px + px_dot(x, y, px, py, mu) * delta_t
@@ -144,14 +161,14 @@ begin
 	    return (x_dot(x_new, y_new, px_new, py_new, mu), y_dot(x_new, y_new, px_new, py_new, mu), px_dot(x_new, y_new, px_new, py_new, mu), py_dot(x_new, y_new, px_new, py_new, mu))
 	end
 
-	function W(x::Float64, y::Float64, mu=0.2)
+	function W(x::Float64, y::Float64, mu::Float64=0.2)
 	    """Функция нормализации значения"""
 	    return -log((abs(diff_u_x(x, y, mu)) + abs(diff_u_y(x, y, mu))), 10)
 	end
 	
-	function h_const(x, y, px=0, py=0, mu=0.2)
+	function h_const(x::Float64, y::Float64, px::Float64=0, py::Float64=0, mu::Float64=0.2)
 	    """Подсчёт постоянной Якоби"""
-	    return 0.5 * (x_dot(x, y, px, py, mu) ^ 2 + y_dot(x, y, px, py, mu) ^ 2) - u(x, y, mu)
+	    return - 0.5 * (x_dot(x, y, px, py, mu) ^ 2 + y_dot(x, y, px, py, mu) ^ 2) + u(x, y, mu)
 	end
 	
 	function puancare(X, Y, delta_t)
@@ -363,7 +380,7 @@ end
 # ╔═╡ 29fce678-6591-4ec6-8d5f-f9b08a8de7ca
 function RK4_step!(body::Body, delta_t::Float64=1e-4)
 	position::Vector{Float64} = [body.x[end], body.y[end], body.px, body.py]
-	k1::Vector{Float64} =  collect(all_dots(position..., body.mu, with_second=false))
+	k1::Vector{Float64} = collect(all_dots(position..., body.mu, with_second=false))
 	k2::Vector{Float64} = collect(all_dots((position .+ delta_t / 2 .* k1)..., body.mu, with_second=false))
 	k3::Vector{Float64} = collect(all_dots((position .+ delta_t / 2 .* k2)..., body.mu, with_second=false))
 	k4::Vector{Float64} = collect(all_dots((position .+ delta_t .* k3)..., body.mu, with_second=false))
@@ -373,6 +390,7 @@ function RK4_step!(body::Body, delta_t::Float64=1e-4)
 	push!(body.y, y)
 	body.px = px
 	body.py = py
+	[x, y, px, py]
 end
 
 # ╔═╡ 7d5a29c9-501b-468f-9611-d2669ae107da
@@ -386,11 +404,21 @@ end
 # ╔═╡ 7b828d7b-8505-41c1-a780-1ba84e951872
 function stormer_step!(body::Body, delta_t::Float64=1e-4)
 	position = [body.x[end], body.y[end], body.px, body.py]
-	k1_2 = position + (delta_t / 2) .* collect(all_dots(position..., body.mu, with_second=false) .* [0, 0, 1, 1])
+	k1_1 = position + (delta_t / 2) .* p_dots(position..., body.mu)
+	k1_2 = k1_1 .+ (q_dots(k1_1..., body.mu) .* delta_t)
+	k2 = position + (delta_t / 2) .* (q_dots(k1_1..., body.mu) .+ q_dots(k1_2..., body.mu))
+	k3 = k1_1 .+ (delta_t / 2) .* p_dots(k1_2..., body.mu)
+	position = [k2[1], k2[2], k3[3], k3[4]]
+	change_body!(body, position...)
 end
 
-# ╔═╡ 2be21cb6-7fa5-4b62-bb2c-4761a3fa8395
-stormer_step!(Body(1.0, 2.0, 4.0, 3.0))
+# ╔═╡ 774cf6cb-1a89-4b88-b28e-7c78fc9471a1
+function move_stormer(body::Body, t::Float64, delta_t::Float64=1e-4)
+for i ∈ 0:delta_t:t
+		stormer_step!(body, delta_t)
+	end
+	return (body.x, body.y)
+end
 
 # ╔═╡ 911f528b-816a-4c6e-9538-2530309f70c6
 function move_leapfrog_gif(x::Float64, y::Float64; px::Float64=0.0, py::Float64=0.0, t::Int64=100000, frames::Int64=100)
@@ -417,39 +445,39 @@ end
 
 # ╔═╡ f06cf227-88de-4f3f-9fc5-1714330a8e3a
 begin
-	L1 = move_RK4(Body(x=L_x[1] - 1e-6, y=0.0, px=0.0, py=0.4372524), 1.44)
+	L1 = move_stormer(Body(x=L_x[1] - 1e-6, y=0.0, px=0.0, py=0.4372524), 1.44)
 	Plots.plot(L1[1], L1[2])
 	
 end
 
 # ╔═╡ 32629dd1-a7fd-45d9-9623-d5665586f489
 begin
-	L2 = move_RK4(Body(x=L_x[2], y=L_y[2], px=0.0, py=1.27183), 2.15)
+	L2 = move_stormer(Body(x=L_x[2], y=L_y[2], px=0.0, py=1.27183), 2.15)
 	Plots.plot(L2[1], L2[2])
 end
 
 # ╔═╡ b8411d90-48e6-403c-ad68-d6671bb53dd6
 begin
-	L3 = move_RK4(Body(x=L_x[3], y=L_y[3], px=0.0, py=-1.0855), 2.35)
+	L3 = move_stormer(Body(x=L_x[3], y=L_y[3], px=0.0, py=-1.0855), 2.35)
 	Plots.plot(L3[1], L3[2])
 end
 
 # ╔═╡ 0f50bb6b-55ca-446a-9ee3-18b528b947d4
 begin
-	L4 = move_RK4(Body(x=L_x[4], y=L_y[4], px=-1.0, py=0.0), 100.0)
+	L4 = move_stormer(Body(x=L_x[4], y=L_y[4], px=-1.0, py=0.0), 100.0)
 	Plots.plot(L4[1], L4[2])
 end
 
 # ╔═╡ ec834d95-fba6-4b7f-9ab4-804113dabf1b
 begin
-	L5 = move_RK2(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5), 100.0)
+	L5 = move_stormer(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5), 100.0)
 	Plots.plot(L5[1], L5[2])
 end
 
 # ╔═╡ 93267c29-cc40-4515-a1fb-28c806d4cbb5
 begin
 	body1 = Body(L_x[1], L_y[1], 0.0, 0.0)
-	move_RK4(body1, 30.0)
+	move_stormer(body1, 30.0)
 	Plots.plot(body1.x, body1.y)
 	Plots.scatter!([-body1.mu, 1-body1.mu], [0, 0])
 end
@@ -464,7 +492,7 @@ end
 # ╔═╡ bd0514de-cc8d-485a-b0e5-46c8d130988f
 begin
 	body2 = Body(x = 0.4, y = 0.4, px = 0.334, py = -0.5)
-	move_RK2(body2, 100.0)
+	move_stormer(body2, 100.0)
 	
 	Plots.plot(body2.x, body2.y)
 	Plots.scatter!([-body2.mu, 1-body2.mu], [0, 0])
@@ -512,16 +540,16 @@ $H(h) = \{ (x, y) \:\colon U(x, y) + C_j \}$
 begin
 	ans_xx, ans_yy = [], []
 	ϵ = 0.01
-	const_h = h_const(L_x[1], L_y[1], 0, 0)
+	const_h = h_const(L_x[1], L_y[1], 0.0, 0.0)
 	for i in -2.0:0.01:2.0
 	    for j in -2.0:0.01:2.0
-	        if abs(u(i, j) + const_h) <= ϵ
+	        if abs(- u(i, j) + const_h) <= ϵ
 	            append!(ans_xx, i)
 	            append!(ans_yy, j)
 	        end
 	    end
 	end
-	a, b = move_RK2(Body(x=L_x[1], y=0.4, px=0.0, py=0.0), 1000.0)
+	a, b = move_stormer(Body(x=L_x[1], y=0.4, px=0.0, py=0.0), 1000.0)
 	scatter(ans_xx, ans_yy)
 	plot!(a, b)
 end
@@ -613,7 +641,7 @@ function accuracy_RK2(body::Body; t::Float64, delta_t::Float64=1e-4)
 	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
 	ans = [h_const0]
 	for i ∈ 0:delta_t:t
-		RK2_step!(body, delta_t)
+		RK4_step!(body, delta_t)
 		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
 		push!(ans, (h_new - h_const0) / h_const0 * 100) 
 
@@ -623,7 +651,7 @@ end
 
 # ╔═╡ defebd59-ba85-4b8b-a4e4-00e364b87f6e
 begin
-	ak2, tk2 = accuracy_RK2(Body(L_x[1], 0.4, 0.0, 0.0), t=200.0)
+	ak2, tk2 = accuracy_RK2(Body(L_x[1], 0.4, 0.4, 0.0), t=200.0)
 	scatter(tk2, ak2, markersize=0.00001)
 end
 
@@ -1726,7 +1754,7 @@ version = "1.4.1+0"
 # ╠═29fce678-6591-4ec6-8d5f-f9b08a8de7ca
 # ╠═7d5a29c9-501b-468f-9611-d2669ae107da
 # ╠═7b828d7b-8505-41c1-a780-1ba84e951872
-# ╠═2be21cb6-7fa5-4b62-bb2c-4761a3fa8395
+# ╠═774cf6cb-1a89-4b88-b28e-7c78fc9471a1
 # ╟─911f528b-816a-4c6e-9538-2530309f70c6
 # ╠═f06cf227-88de-4f3f-9fc5-1714330a8e3a
 # ╠═32629dd1-a7fd-45d9-9623-d5665586f489
