@@ -318,23 +318,6 @@ begin
 	nothing
 end
 
-# ╔═╡ de3a78b5-bcd0-4537-8354-1418f449be4a
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	function move_leapfrog(body::Body, t::Float64=1.0, delta_t::Float64=1e-4)
-	    
-		x_vel, y_vel, px_vel, py_vel = initial_velocities(body.x[end], body.y[end], body.px, body.py, delta_t)
-	    
-	    for i in 0:delta_t:t
-	        x_vel, y_vel, px_vel, py_vel = leapfrog_iter!(body, x_vel, y_vel, px_vel, py_vel, delta_t)
-	    end
-	    return (body.x, body.y)
-	end
-	nothing
-end
-  ╠═╡ =#
-
 # ╔═╡ 23c2bc64-eb21-4a32-b428-e2d9b325c1c1
 function verlet_iter!(body::Body, delta_t::Float64=1e-4)
 	derivatives = all_dots(body.x[end], body.y[end], body.px, body.py, body.mu)
@@ -559,31 +542,6 @@ md"""
 Воспользуемся интегралом Якоби для определения точности численного интегрирования
 """
 
-# ╔═╡ 1f65f3e5-432e-4c42-b194-6b16f429ce38
-# ╠═╡ disabled = true
-#=╠═╡
-function accuracy_leapfrog(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
-	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
-	ans_h = []
-	x_vel, y_vel, px_vel, py_vel = initial_velocities(body.x[end], body.y[end], body.px, body.py, delta_t)
-	for i ∈ 1:delta_t:t
-		x_vel, y_vel = leapfrog_iter!(body, x_vel, y_vel, px_vel, py_vel, delta_t)
-		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu) 
-		push!(ans_h, (abs(h_new) - abs(h_const0)) / abs(h_const0) * 100)
-	end
-	return (ans_h, 1:delta_t:t)
-	
-end
-  ╠═╡ =#
-
-# ╔═╡ 024950bd-c4e0-454d-bf51-4c2bac424f90
-#=╠═╡
-begin
-	ak1, tk1 = accuracy_leapfrog(Body(L_x[1], L_y[1], 0.0, 0.0), t=200.0)
-	scatter(tk1, ak1, markersize=0.000001)
-end
-  ╠═╡ =#
-
 # ╔═╡ 86e576f7-32fa-428c-b921-1d4652c009aa
 function accuracy_euler(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
 	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
@@ -596,45 +554,6 @@ function accuracy_euler(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
 	return (ans_h, 1:delta_t:t)
 	
 end
-
-# ╔═╡ 68f05f3f-01e7-49af-af05-fa2a8f09fe4d
-# ╠═╡ disabled = true
-#=╠═╡
-function accuracy_verlet(body::Body, t::Float64, delta_t::Float64=1e-4)
-	derivatives = all_dots(body.x[end], body.y[end], body.px, body.py, body.mu)
-	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
-	ans = [h_const0]
-	
-	push!(body.x, body.x[end] + derivatives[1] * delta_t + derivatives[5] * delta_t^2 / 2)
-	push!(body.y, body.y[end] + derivatives[2] * delta_t + derivatives[6] * delta_t^2 / 2)
-	push!(ans, h_const(body.x[end], body.y[end], body.px, body.py, body.mu))
-	for i ∈ 0:delta_t:t
-		verlet_iter!(body, delta_t)
-		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
-		push!(ans, (h_new - h_const0) / h_const0 * 100) 
-
-	end
-	return (ans, 0:delta_t:t)
-end
-  ╠═╡ =#
-
-# ╔═╡ 1127fe48-8f43-40be-a861-00cc641ec3fb
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	ak3, tk3 = accuracy_verlet(Body(L_x[1], L_y[1], 0.0, 0.0), 200.0)
-	scatter(tk3, ak3, markersize=0.00001)
-end
-  ╠═╡ =#
-
-# ╔═╡ 08f3874a-8a2a-4c16-a9be-749beee1547b
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	ak2, tk2 = accuracy_euler(Body(L_x[1], 0.4, 0.0, 0.0), t=200.0)
-	scatter(tk2, ak2, markersize=0.00001)
-end
-  ╠═╡ =#
 
 # ╔═╡ ab40a600-e4ca-4927-a8cf-85d98cc9e7ca
 function accuracy_RK2(body::Body; t::Float64, delta_t::Float64=1e-4)
@@ -662,7 +581,7 @@ md"""
 
 # ╔═╡ c361a162-30ee-47b8-88f4-2e59225da70c
 begin
-	ɼ1, ɼ2 = move_RK4(Body(x=1000.0, y=10000000.0, px=1000000.0, py=10000000.0), 100.0)
+	ɼ1, ɼ2 = move_stormer(Body(x=1000.0, y=10000000.0, px=1000000.0, py=10000000.0), 200.0)
 	plot(ɼ1, ɼ2)
 end
 
@@ -701,18 +620,39 @@ md"""
 	gif(anim, name, fps=fps)
 end
 
-# ╔═╡ 5939245c-0571-4e24-a39b-53d813a61e62
-# ╠═╡ skip_as_script = true
-#=╠═╡
-animate_non_rotating(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5), t=10.0, frames=500)
-  ╠═╡ =#
-
-# ╔═╡ 82016362-5e1c-411f-813a-2d92c8265537
-# ╠═╡ show_logs = false
-animate_non_rotating(Body(x=0.0, y=10000000.0, px=10000000.0, py=10000000.0), t=10.0, frames=500, xlim=2.5e7, ylim=2.5e7, name="ellips.gif")
-
 # ╔═╡ 984d2d1b-8333-4e88-ba23-d5fdcc7927a4
+md"""
+**Проверка теоремы Лиувилля о сохранение фазового объёма**
+"""
 
+# ╔═╡ efd1bb93-bf79-4aef-aa2c-a3622750d632
+function move_some(bodies::Array{Body}, t:: Float64=5.0; delta_t::Float64=1e-4, move::Function=move_RK4)
+	for i ∈ bodies
+		move(i, t, delta_t)
+	end
+end
+
+# ╔═╡ 292ffba1-ef46-4e66-88ce-783618467592
+function polygon_area(dots::Array)
+	"""Функция нахождения площади выпуклой оболочки"""
+	x0 = dots[1, 1]
+	y0 = dots[1, 2]
+	sq = 0
+	
+	for i ∈ 2:size(dots)[1]
+		sq += (dots[i, 1] - dots[i - 1, 1]) * (dots[i, 2] + dots[i - 1, 2])
+	end
+	sq += (dots[end, 1] - x0) * (dots[end, 2] + y0)
+	return abs(sq / 2)
+end
+
+# ╔═╡ ce716daa-c750-41a9-86c3-6b63f88903c6
+polygon_area([1.0 1.0; 4.0 1.0; 2.0 5.0])
+
+# ╔═╡ 10b0371e-fc41-4696-bbc7-440b26236274
+function hull(bodies::Array{Body})
+
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1780,8 +1720,10 @@ version = "1.4.1+0"
 # ╠═c361a162-30ee-47b8-88f4-2e59225da70c
 # ╟─56d02fea-a060-4634-abe9-082c706fc0f3
 # ╠═1c0ad33c-2490-4922-9c61-8b5595cef356
-# ╠═5939245c-0571-4e24-a39b-53d813a61e62
-# ╠═82016362-5e1c-411f-813a-2d92c8265537
-# ╠═984d2d1b-8333-4e88-ba23-d5fdcc7927a4
+# ╟─984d2d1b-8333-4e88-ba23-d5fdcc7927a4
+# ╠═efd1bb93-bf79-4aef-aa2c-a3622750d632
+# ╠═292ffba1-ef46-4e66-88ce-783618467592
+# ╠═ce716daa-c750-41a9-86c3-6b63f88903c6
+# ╠═10b0371e-fc41-4696-bbc7-440b26236274
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
