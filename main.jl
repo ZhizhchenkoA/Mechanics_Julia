@@ -61,7 +61,10 @@ begin
 		body.py = py
 		nothing
 	end
-	nothing
+
+	function body_cords(body::Body)
+		return [body.x[end], body.y[end], body.px, body.py, body.mu]
+	end
 end
 
 # ╔═╡ 56257e88-88f1-4c52-a9b4-382f6de339f6
@@ -70,7 +73,7 @@ begin
 	    """Потенциал тела U(x, y)"""
 	    r1 = sqrt((x + mu)^2 + y^2)
 	    r2 = sqrt((x - 1 + mu)^2 + y^2)
-	    return (x^2 + y^2) / 2 + (1 - mu) / r1 + mu / r2 + ((1 - mu) * mu) / 2
+	    return - ((x^2 + y^2) / 2 + (1 - mu) / r1 + mu / r2 + ((1 - mu) * mu) / 2)
 	end
 	
 	function h(x::Float64, y::Float64, px::Float64, py::Float64, mu::Float64=0.2)
@@ -82,13 +85,13 @@ begin
 	function diff_u_x(x::Float64, y::Float64, mu::Float64=0.2)
 	    """Производная в точке от U(x, y) по x"""
 	    delta = 1e-10
-	    return  - (u(x + delta / 2, y, mu) - u(x - delta / 2, y, mu)) / delta
+	    return  (u(x + delta / 2, y, mu) - u(x - delta / 2, y, mu)) / delta
 	end
 	
 	function diff_u_y(x::Float64, y::Float64, mu::Float64=0.2)
 	    """Производная в точке от U(x, y) по y"""
 	    delta = 1e-10
-	    return  - (u(x, y + delta / 2) - u(x, y - delta / 2)) / delta
+	    return  (u(x, y + delta / 2) - u(x, y - delta / 2)) / delta
 	end
 
 
@@ -168,7 +171,7 @@ begin
 	
 	function h_const(x::Float64, y::Float64, px::Float64=0, py::Float64=0, mu::Float64=0.2)
 	    """Подсчёт постоянной Якоби"""
-	    return - 0.5 * (x_dot(x, y, px, py, mu) ^ 2 + y_dot(x, y, px, py, mu) ^ 2) + u(x, y, mu)
+	    return - (x_dot(x, y, px, py, mu) ^ 2 + y_dot(x, y, px, py, mu) ^ 2) + 2 * u(x, y, mu)
 	end
 	
 	function puancare(X, Y, delta_t)
@@ -317,6 +320,23 @@ begin
 	end
 	nothing
 end
+
+# ╔═╡ de3a78b5-bcd0-4537-8354-1418f449be4a
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	function move_leapfrog(body::Body, t::Float64=1.0, delta_t::Float64=1e-4)
+	    
+		x_vel, y_vel, px_vel, py_vel = initial_velocities(body.x[end], body.y[end], body.px, body.py, delta_t)
+	    
+	    for i in 0:delta_t:t
+	        x_vel, y_vel, px_vel, py_vel = leapfrog_iter!(body, x_vel, y_vel, px_vel, py_vel, delta_t)
+	    end
+	    return (body.x, body.y)
+	end
+	nothing
+end
+  ╠═╡ =#
 
 # ╔═╡ 23c2bc64-eb21-4a32-b428-e2d9b325c1c1
 function verlet_iter!(body::Body, delta_t::Float64=1e-4)
@@ -520,27 +540,61 @@ $H(h) = \{ (x, y) \:\colon U(x, y) + C_j \}$
  """
 
 # ╔═╡ 1207920a-0ebc-46de-b426-3abea1664eef
-begin
+function zero_velocity(body::Body; t::Float64=1000.0, ϵ::Float64=0.01)
 	ans_xx, ans_yy = [], []
 	ϵ = 0.01
-	const_h = h_const(L_x[1], L_y[1], 0.0, 0.0)
+	const_h = h_const(body_cords(body)...)
 	for i in -2.0:0.01:2.0
 	    for j in -2.0:0.01:2.0
-	        if abs(- u(i, j) + const_h) <= ϵ
+	        if abs(-2u(i, j) + const_h) <= ϵ
 	            append!(ans_xx, i)
 	            append!(ans_yy, j)
 	        end
 	    end
 	end
-	a, b = move_stormer(Body(x=L_x[1], y=0.4, px=0.0, py=0.0), 1000.0)
+	a, b = move_stormer(body, 1000.0)
 	scatter(ans_xx, ans_yy)
 	plot!(a, b)
 end
+
+# ╔═╡ 919be67a-1988-4cf7-a660-6db6183fef1c
+zero_velocity(Body(x=0.2, y=0.4, px=0.0, py=0.0))
+
+# ╔═╡ 8a948b7e-8520-45b4-93ef-3add2d0c50da
+zero_velocity(Body(x=0.5, y=0.5, px=-0.2, py=0.2))
+
+# ╔═╡ 5a001069-c770-4450-b09f-f0b4f1f7f5c1
+zero_velocity(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5))
 
 # ╔═╡ 5bec7dcf-5d47-4674-9cf9-7dabb4c671bf
 md"""
 Воспользуемся интегралом Якоби для определения точности численного интегрирования
 """
+
+# ╔═╡ 1f65f3e5-432e-4c42-b194-6b16f429ce38
+# ╠═╡ disabled = true
+#=╠═╡
+function accuracy_leapfrog(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
+	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
+	ans_h = []
+	x_vel, y_vel, px_vel, py_vel = initial_velocities(body.x[end], body.y[end], body.px, body.py, delta_t)
+	for i ∈ 1:delta_t:t
+		x_vel, y_vel = leapfrog_iter!(body, x_vel, y_vel, px_vel, py_vel, delta_t)
+		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu) 
+		push!(ans_h, (abs(h_new) - abs(h_const0)) / abs(h_const0) * 100)
+	end
+	return (ans_h, 1:delta_t:t)
+	
+end
+  ╠═╡ =#
+
+# ╔═╡ 024950bd-c4e0-454d-bf51-4c2bac424f90
+#=╠═╡
+begin
+	ak1, tk1 = accuracy_leapfrog(Body(L_x[1], L_y[1], 0.0, 0.0), t=200.0)
+	scatter(tk1, ak1, markersize=0.000001)
+end
+  ╠═╡ =#
 
 # ╔═╡ 86e576f7-32fa-428c-b921-1d4652c009aa
 function accuracy_euler(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
@@ -555,10 +609,49 @@ function accuracy_euler(body::Body; t::Float64=10.0, delta_t::Float64=1e-4)
 	
 end
 
+# ╔═╡ 68f05f3f-01e7-49af-af05-fa2a8f09fe4d
+# ╠═╡ disabled = true
+#=╠═╡
+function accuracy_verlet(body::Body, t::Float64, delta_t::Float64=1e-4)
+	derivatives = all_dots(body.x[end], body.y[end], body.px, body.py, body.mu)
+	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
+	ans = [h_const0]
+	
+	push!(body.x, body.x[end] + derivatives[1] * delta_t + derivatives[5] * delta_t^2 / 2)
+	push!(body.y, body.y[end] + derivatives[2] * delta_t + derivatives[6] * delta_t^2 / 2)
+	push!(ans, h_const(body.x[end], body.y[end], body.px, body.py, body.mu))
+	for i ∈ 0:delta_t:t
+		verlet_iter!(body, delta_t)
+		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
+		push!(ans, (h_new - h_const0) / h_const0 * 100) 
+
+	end
+	return (ans, 0:delta_t:t)
+end
+  ╠═╡ =#
+
+# ╔═╡ 1127fe48-8f43-40be-a861-00cc641ec3fb
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	ak3, tk3 = accuracy_verlet(Body(L_x[1], L_y[1], 0.0, 0.0), 200.0)
+	scatter(tk3, ak3, markersize=0.00001)
+end
+  ╠═╡ =#
+
+# ╔═╡ 08f3874a-8a2a-4c16-a9be-749beee1547b
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	ak2, tk2 = accuracy_euler(Body(L_x[1], 0.4, 0.0, 0.0), t=200.0)
+	scatter(tk2, ak2, markersize=0.00001)
+end
+  ╠═╡ =#
+
 # ╔═╡ ab40a600-e4ca-4927-a8cf-85d98cc9e7ca
 function accuracy_RK2(body::Body; t::Float64, delta_t::Float64=1e-4)
 	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
-	ans = [h_const0]
+	ans = []
 	for i ∈ 0:delta_t:t
 		RK4_step!(body, delta_t)
 		h_new = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
@@ -570,7 +663,7 @@ end
 
 # ╔═╡ defebd59-ba85-4b8b-a4e4-00e364b87f6e
 begin
-	ak2, tk2 = accuracy_RK2(Body(L_x[1], 0.4, 0.4, 0.0), t=200.0)
+	ak2, tk2 = accuracy_RK2(Body(L_x[1], 0.4, 0.4, 0.0), t=100.0)
 	scatter(tk2, ak2, markersize=0.00001)
 end
 
@@ -605,10 +698,11 @@ md"""
 	anim = @animate for i in 0:1:(t / delta_t)
         x_vel, y_vel = leapfrog_iter!(body, x_vel, y_vel, delta_t)
 		psi += delta_t 
-		x1, y1 = ro1 * cos(psi), ro1 * sin(psi)
-		x2, y2 = ro2 * cos(psi), ro2 * sin(psi)
+		
 		
 		if i % frames == 0
+			x1, y1 = ro1 * cos(psi), ro1 * sin(psi)
+		x2, y2 = ro2 * cos(psi), ro2 * sin(psi)
 			x_1 = body.x[end] * cos(psi) - body.y[end] * sin(psi)
 			y_1 = body.x[end] * sin(psi) + body.y[end] * cos(psi)
 			scatter([x1, x2], [y1, y2], xlim=(-xlim, xlim), ylim=(-ylim, ylim), color="black")
@@ -652,6 +746,28 @@ polygon_area([1.0 1.0; 4.0 1.0; 2.0 5.0])
 # ╔═╡ 10b0371e-fc41-4696-bbc7-440b26236274
 function hull(bodies::Array{Body})
 
+end
+
+# ╔═╡ f311fb12-9555-4718-b35d-d5be82352cdc
+function liouville_x(x, y, px, py, mu=0.2; dx=1e-3, dpx=1e-3, t=10.0, step_t=1.0)
+	body_lst = [Body(x, y, px, py, mu), Body(x+dx, y, px, py,mu), Body(x, y, px+dpx, py, mu)]
+	ans = [dpx * dx]
+	for i ∈ 0:step_t:t
+		for body ∈ body_lst
+			move_RK2(body, step_t)
+		end
+		push!(ans, (body_lst[2].x[end] - body_lst[1].x[end]) * (body_lst[3].px - body_lst[1].px))
+		
+	end
+	println(ans)
+	println(collect(0:step_t:t))
+	return (collect(0:step_t:t), ans)
+end
+
+# ╔═╡ 9051aa79-c590-4a2a-9d04-5a01a5d29b3b
+begin
+	ans1 = liouville_x(0.5, 0.3, 0.1, 0.7)
+	plot!(ans1[1], ans1[2])
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1707,6 +1823,9 @@ version = "1.4.1+0"
 # ╠═d23baf85-ce21-4a93-bc95-a6643cd59ce7
 # ╟─8eb16823-767b-4fcf-98da-3da540ca66fd
 # ╠═1207920a-0ebc-46de-b426-3abea1664eef
+# ╠═919be67a-1988-4cf7-a660-6db6183fef1c
+# ╠═8a948b7e-8520-45b4-93ef-3add2d0c50da
+# ╠═5a001069-c770-4450-b09f-f0b4f1f7f5c1
 # ╟─5bec7dcf-5d47-4674-9cf9-7dabb4c671bf
 # ╠═1f65f3e5-432e-4c42-b194-6b16f429ce38
 # ╠═024950bd-c4e0-454d-bf51-4c2bac424f90
@@ -1725,5 +1844,7 @@ version = "1.4.1+0"
 # ╠═292ffba1-ef46-4e66-88ce-783618467592
 # ╠═ce716daa-c750-41a9-86c3-6b63f88903c6
 # ╠═10b0371e-fc41-4696-bbc7-440b26236274
+# ╠═f311fb12-9555-4718-b35d-d5be82352cdc
+# ╠═9051aa79-c590-4a2a-9d04-5a01a5d29b3b
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
