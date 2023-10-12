@@ -67,6 +67,12 @@ begin
 	end
 end
 
+# ╔═╡ d3f8fd38-ba29-4234-a316-724cfb5ff183
+struct Point
+	x::Float64
+	y::Float64
+end
+
 # ╔═╡ 56257e88-88f1-4c52-a9b4-382f6de339f6
 begin
 	function u(x::Float64, y::Float64, mu::Float64=0.2)
@@ -192,6 +198,36 @@ begin
 	nothing
 end
 
+# ╔═╡ c1590f21-e4eb-48cb-8c0d-fb98fbfed059
+function gradient(x::Float64, mu::Float64=0.2; iterations::Int64=100)
+	λ = 0.01
+	for i ∈ 1:1:100
+		x += λ*diff_u_x(x, 0.0, mu)
+	end
+	return x
+end
+
+# ╔═╡ fc385955-4924-4326-ab8e-d37ecd5f65e4
+@with_kw mutable struct Lagrange
+	L1::Point
+	L2::Point
+	L3::Point
+	L4::Point
+	L5::Point
+
+	function Lagrange(mu::Float64)
+		l1::Point = Point(gradient(1 - ((mu/ (1 - mu)) / 3)^(1/3), mu), 0)
+		l2::Point = Point(gradient(1 + ((mu/ (1 - mu)) / 3)^(1/3), mu), 0)
+		l3::Point = Point(gradient(- 1 - 5*(mu/ (1 - mu)) / 12, mu), 0)
+		l4::Point = Point(1/2 - mu, sqrt(3) / 2)
+		l5::Point = Point(1/2 - mu, sqrt(3) / 2)
+		new(l1, l2, l3, l4, l5)
+	end
+end
+
+# ╔═╡ 41788216-b144-4460-bded-e87992c3d57a
+Lagrange(0.2).L4
+
 # ╔═╡ 9f7c73f7-226e-4c04-9741-834f46531deb
 html"""
 <h1 align="center"> Эпизод I<br> <b>Визуализация точек Лагранжа, полости Роша и сферы Хилла</b></h1>
@@ -208,6 +244,27 @@ begin
 		step_x = 0.01
 		lim_y_min, lim_y_max = -2, 2
 		step_y = 0.01
+end
+
+# ╔═╡ e41e33a5-212f-403f-b51c-ae94dfab293b
+begin
+	ans_x = []
+	ans_y = []
+	epsilon = 0
+	
+	for x in lim_x_min:step_x:lim_x_max
+	    for y in lim_y_min:step_y:lim_y_max
+	         if (u(x, y) - u(x - step_x, y)) * (u(x + step_x, y) - u(x, y)) < epsilon && (u(x, y) - u(x, y - step_y)) * (u(x, y + step_y) - u(x, y)) < epsilon
+	                append!(ans_x, x)
+	                append!(ans_y, y)
+	        end
+	    end
+	end
+	L_x = [ans_x[7], ans_x[9], ans_x[1], ans_x[4], ans_x[3]]
+	L_y = [ans_y[7], ans_y[9], ans_y[1], ans_y[4], ans_y[3]]
+	println(L_x)
+	println(L_y)
+	
 end
 
 # ╔═╡ 7befb0a2-e81f-4d8b-bd09-4f253dc36325
@@ -243,11 +300,11 @@ my = np.arange(lim_y_min, lim_y_max, step_y)
 Координаты этих точек также задаются формулами:
 
 $\begin{gather}
-L_1 \:(R(1 - \sqrt[3]{\frac{\mu}{3}},\; 0))\\
-L_2 \:(R(1 + \sqrt[3]{\frac{\mu}{3}}, \; 0)\\
-L_3 \:(R(1 - \frac{5}{12}\mu, \; 0)\\
-L_4 \:(\frac{R}{2} \cdot \frac{m_1-m_2}{m_1+m_2}, \; \frac{\sqrt[3]{3}}{2}R)\\
-L_5 \:(\frac{R}{2} \cdot \frac{m_1-m_2}{m_1+m_2}, \; -\frac{\sqrt[3]{3}}{2}R)\\
+L_1 \left(R\left(1 - \sqrt[3]{\frac{\mu}{3}}\right),\; 0\right)\\
+L_2 \left(R\left(1 + \sqrt[3]{\frac{\mu}{3}}\right), \; 0\right)\\
+L_3 \left(R\left(1 - \frac{5}{12}\mu \right), \; 0 \right)\\
+L_4 \left(\frac{R}{2} \cdot \frac{m_1-m_2}{m_1+m_2}, \; \frac{\sqrt{3}}{2}R\right)\\
+L_5 \left(\frac{R}{2} \cdot \frac{m_1-m_2}{m_1+m_2}, \; -\frac{\sqrt{3}}{2}R\right)\\
 \end{gather}$
 
 где:  
@@ -258,26 +315,6 @@ L_5 \:(\frac{R}{2} \cdot \frac{m_1-m_2}{m_1+m_2}, \; -\frac{\sqrt[3]{3}}{2}R)\\
 
 - ㅤ$R$ расстояние между телами
 """
-
-# ╔═╡ e41e33a5-212f-403f-b51c-ae94dfab293b
-begin
-	ans_x = []
-	ans_y = []
-	epsilon = 0
-	
-	for x in lim_x_min:step_x:lim_x_max
-	    for y in lim_y_min:step_y:lim_y_max
-	         if (u(x, y) - u(x - step_x, y)) * (u(x + step_x, y) - u(x, y)) < epsilon && (u(x, y) - u(x, y - step_y)) * (u(x, y + step_y) - u(x, y)) < epsilon
-	                append!(ans_x, x)
-	                append!(ans_y, y)
-	        end
-	    end
-	end
-	L_x = [ans_x[7], ans_x[9], ans_x[1], ans_x[4], ans_x[3]]
-	L_y = [ans_y[7], ans_y[9], ans_y[1], ans_y[4], ans_y[3]]
-	println(L_x)
-	println(L_y)
-end
 
 # ╔═╡ cfec2969-c486-43e8-aeed-f53157a55563
 html"""
@@ -509,7 +546,9 @@ end
 
 # ╔═╡ 8eb16823-767b-4fcf-98da-3da540ca66fd
 md"""
-__Вывод интеграла Якоби, единственной формы энергии, сохраняющейся в ограниченной задаче трёх тел:__
+## Вывод интеграла Якоби, единственной формы энергии, сохраняющейся в ограниченной задаче трёх тел:
+
+---
 
 Интегрируем выражение 
 
@@ -540,9 +579,9 @@ $H(h) = \{ (x, y) \:\colon U(x, y) + C_j \}$
  """
 
 # ╔═╡ 1207920a-0ebc-46de-b426-3abea1664eef
-function zero_velocity(body::Body; t::Float64=1000.0, ϵ::Float64=0.01)
-	ans_xx, ans_yy = [], []
-	ϵ = 0.01
+@fastmath function zero_velocity(body::Body; t::Float64=1000.0, ϵ::Float64=0.01)
+	ans_xx::Array{Float64}, ans_yy::Array{Float64} = [], []
+	ϵ::Float64 = 0.01
 	const_h = h_const(body_cords(body)...)
 	for i in -2.0:0.01:2.0
 	    for j in -2.0:0.01:2.0
@@ -564,7 +603,10 @@ zero_velocity(Body(x=0.2, y=0.4, px=0.0, py=0.0))
 zero_velocity(Body(x=0.5, y=0.5, px=-0.2, py=0.2))
 
 # ╔═╡ 5a001069-c770-4450-b09f-f0b4f1f7f5c1
+# ╠═╡ disabled = true
+#=╠═╡
 zero_velocity(Body(x=L_x[5], y=L_y[5], px=0.9, py=0.5))
+  ╠═╡ =#
 
 # ╔═╡ 5bec7dcf-5d47-4674-9cf9-7dabb4c671bf
 md"""
@@ -649,6 +691,8 @@ end
   ╠═╡ =#
 
 # ╔═╡ ab40a600-e4ca-4927-a8cf-85d98cc9e7ca
+# ╠═╡ disabled = true
+#=╠═╡
 function accuracy_RK2(body::Body; t::Float64, delta_t::Float64=1e-4)
 	h_const0 = h_const(body.x[end], body.y[end], body.px, body.py, body.mu)
 	ans = []
@@ -660,12 +704,15 @@ function accuracy_RK2(body::Body; t::Float64, delta_t::Float64=1e-4)
 	end
 	return (ans, 0:delta_t:t)
 end
+  ╠═╡ =#
 
 # ╔═╡ defebd59-ba85-4b8b-a4e4-00e364b87f6e
+#=╠═╡
 begin
 	ak2, tk2 = accuracy_RK2(Body(L_x[1], 0.4, 0.4, 0.0), t=100.0)
 	scatter(tk2, ak2, markersize=0.00001)
 end
+  ╠═╡ =#
 
 # ╔═╡ 30358f2c-0329-4b59-82e4-f208e8596f25
 md"""
@@ -764,11 +811,44 @@ function liouville_x(x, y, px, py, mu=0.2; dx=1e-3, dpx=1e-3, t=10.0, step_t=1.0
 	return (collect(0:step_t:t), ans)
 end
 
-# ╔═╡ 9051aa79-c590-4a2a-9d04-5a01a5d29b3b
-begin
-	ans1 = liouville_x(0.5, 0.3, 0.1, 0.7)
-	plot!(ans1[1], ans1[2])
+# ╔═╡ 45ebe637-d840-4f7b-8e64-04f8d3fed5ef
+md"""
+_Интеграл Якоби_
+
+$C_j = 2U(x, y) - (\dot x^2 + \dot y^2)$
+
+Произведём замену $\dot x = p_x + y$, $\dot y = p_y - x$
+Посдставим значения в интеграл
+
+$C_j = 2U(x, y) - ((p_x + y)^2 + (p_y - x)^2)$
+
+Пусть 
+
+$\dot x = p_x + y = 0$ 
+"""
+
+# ╔═╡ 4f4728fe-e264-4231-88e0-a89258d79b61
+function Jacobi_move(x::Float64, y::Float64, Cⱼ::Float64, μ::Float64=0.2)::Body
+	px = - y
+	py = sqrt(abs(2*u(x, y, μ) + Cⱼ)) + x
+	return Body(x, y, px, py, μ)
 end
+
+# ╔═╡ 8f9b8829-ddd9-448d-b728-374d995ab59d
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	const LAGRANGE_1_2 = Lagrange(1/82.27)
+	bodyₙ = Jacobi_move(1-1/82, 0.0, -0.8668, 1/82.27)
+	plot(move_RK2(bodyₙ, 10.0)...)
+	scatter!([-0.5, 0.5], [0, 0])
+end
+  ╠═╡ =#
+
+# ╔═╡ d5844f01-7cd0-4105-b72e-1dec9695cc54
+md"""
+# **Поиск периодических орбит**
+"""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1790,14 +1870,18 @@ version = "1.4.1+0"
 # ╟─d3f35948-a39c-462c-9412-8bbefa334fe2
 # ╟─a3e811d7-0a06-44a6-a9db-0d21983b212a
 # ╠═f997a055-a870-430a-8aca-5060c2fd16cb
+# ╠═d3f8fd38-ba29-4234-a316-724cfb5ff183
 # ╠═56257e88-88f1-4c52-a9b4-382f6de339f6
+# ╟─c1590f21-e4eb-48cb-8c0d-fb98fbfed059
+# ╠═fc385955-4924-4326-ab8e-d37ecd5f65e4
+# ╠═41788216-b144-4460-bded-e87992c3d57a
+# ╠═e41e33a5-212f-403f-b51c-ae94dfab293b
 # ╟─9f7c73f7-226e-4c04-9741-834f46531deb
 # ╟─8ff68780-6554-4873-9abb-aa118e116f62
 # ╠═2a4aa267-796c-4090-ad20-3ce806868726
 # ╠═7befb0a2-e81f-4d8b-bd09-4f253dc36325
 # ╟─1e8db92f-d780-4052-9381-87d0719659cb
 # ╟─ad124e1c-e3bf-47f7-b7a5-f1d97e00a14c
-# ╠═e41e33a5-212f-403f-b51c-ae94dfab293b
 # ╟─cfec2969-c486-43e8-aeed-f53157a55563
 # ╟─9a3aedf3-4958-4284-81f5-654f7835fae2
 # ╠═7979f857-0489-4435-ad9e-1240c90a3525
@@ -1838,13 +1922,16 @@ version = "1.4.1+0"
 # ╟─30358f2c-0329-4b59-82e4-f208e8596f25
 # ╠═c361a162-30ee-47b8-88f4-2e59225da70c
 # ╟─56d02fea-a060-4634-abe9-082c706fc0f3
-# ╠═1c0ad33c-2490-4922-9c61-8b5595cef356
+# ╟─1c0ad33c-2490-4922-9c61-8b5595cef356
 # ╟─984d2d1b-8333-4e88-ba23-d5fdcc7927a4
-# ╠═efd1bb93-bf79-4aef-aa2c-a3622750d632
-# ╠═292ffba1-ef46-4e66-88ce-783618467592
-# ╠═ce716daa-c750-41a9-86c3-6b63f88903c6
-# ╠═10b0371e-fc41-4696-bbc7-440b26236274
-# ╠═f311fb12-9555-4718-b35d-d5be82352cdc
-# ╠═9051aa79-c590-4a2a-9d04-5a01a5d29b3b
+# ╟─efd1bb93-bf79-4aef-aa2c-a3622750d632
+# ╟─292ffba1-ef46-4e66-88ce-783618467592
+# ╟─ce716daa-c750-41a9-86c3-6b63f88903c6
+# ╟─10b0371e-fc41-4696-bbc7-440b26236274
+# ╟─f311fb12-9555-4718-b35d-d5be82352cdc
+# ╟─45ebe637-d840-4f7b-8e64-04f8d3fed5ef
+# ╠═4f4728fe-e264-4231-88e0-a89258d79b61
+# ╠═8f9b8829-ddd9-448d-b728-374d995ab59d
+# ╟─d5844f01-7cd0-4105-b72e-1dec9695cc54
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
